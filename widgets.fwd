@@ -1,0 +1,133 @@
+{
+  "title": "玛卡巴卡的模块",
+  "description": "𝑀𝑎𝑘𝑘𝑎𝑃𝑎𝑘𝑘𝑎'𝑠 𝑊𝑖𝑑𝑔𝑒𝑡𝑠",
+  "icon": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/tubiao/makka.png",
+  "widgets": [
+    {
+      "id": "anime_omni_fix",
+      "title": "二次元全境聚合",
+      "description": "一站式聚合多平台动漫榜单。",
+      "requiredVersion": "0.0.1",
+      "version": "2.2.4",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/dongmanone.js"
+    },
+    {
+      "id": "trakt_personal_key",
+      "title": "Trak 追剧日历 免key版",
+      "description": "内置 Key 版：只需填写用户名即可使用。显示追剧日历、待看、收藏及历史记录",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.8",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/traktkey.js"
+    },
+    {
+      "id": "trakt_personal_mixed",
+      "title": "Trak 追剧日历&个人中心",
+      "description": "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.8",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/trakt.js"
+    },
+    {
+      "id": "variety_hub_ultimate_v4_fix",
+      "title": "全球综艺追更热度榜",
+      "description": "综艺更新时间表，热度榜",
+      "requiredVersion": "0.0.1",
+      "version": "2.0.3",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/zongyi.js"
+    },
+    {
+      "id": "western_trends_hub",
+      "title": "欧美风向标|口碑与热度",
+      "description": "聚合烂番茄(口碑)与流媒体平台(热度)，一站式掌握欧美影视动态。",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.2",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/west.js"
+    },
+    {
+      "id": "global_tv_calendar_ultimate",
+      "title": "全球追剧时刻表",
+      "description": "聚合全球剧集更新&综艺排期&bangumi动漫周更表。",
+      "requiredVersion": "0.0.1",
+      "version": "2.0.9",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/zjrl.js"
+    },
+    {
+      "id": "cinephile_hub_ultimate",
+      "title": "影迷宝藏 | 系列与流派",
+      "description": "聚合【系列电影大满贯】与【趣味流派探索】，一键补番，探索未知。",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.3",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/xilie.js"
+    },
+    {
+      "id": "discover_hub_ultimate",
+      "title": "探索发现 | 惊喜推荐",
+      "description": "聚合【今天看什么】、【Trakt惊喜推荐】与【那年今日】、一站式发现好片。",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.4",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/today.js"
+    },
+    {
+      "id": "ultimate_media_hub_pro_ui",
+      "title": "全球影视 | 分流聚合",
+      "description": "集大成之作：Trakt/豆瓣/平台分流，全线支持【年份•类型】展示。",
+      "requiredVersion": "0.0.1",
+      "version": "1.2.1",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/mediahub.js"
+    },
+    {
+      "id": "makka.platform.originals",
+      "title": "流媒体·独家原创（更新时间版）",
+      "description": "各平台独播剧",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.5",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/liumeititime.js"
+    },
+    {
+      "id": "platform.originals.ui.fix",
+      "title": "流媒体·独家原创",
+      "description": "发现Netflix/HBO/腾讯/B站等平台自制内容",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.4",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/liumeiti.js"
+    },
+    {
+      "id": "danmu.pro.online",
+      "title": "弹幕多源",
+      "description": "支持添加多条api并自命名&繁简互转",
+      "requiredVersion": "0.0.1",
+      "version": "1.1.3",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/danmuapipro.js"
+    },
+    {
+      "id": "forward.combined.makkapakka",
+      "title": "影视榜单Lite",
+      "description": "豆瓣全能推荐 | TMDB探索 | 猜你想看",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.4",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/ysbd.js"
+    },
+    {
+      "id": "imdb_cn_fix_",
+      "title": "IMDb热榜",
+      "description": "IMDb全球榜单，支持日/周纬度切换。",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.3",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/imdb.js"
+    }
+  ]
+}
