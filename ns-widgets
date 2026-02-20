@@ -40,15 +40,6 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/WFSN/refs/heads/main/widgetsns/able.js"
     },
     {
-      "id": "missav_int",
-      "title": "MissAV",
-      "description": "網路收集到的模塊",
-      "requiredVersion": "0.0.2",
-      "version": "2.0.0",
-      "author": "蝴蝶",
-      "url": "https://raw.githubusercontent.com/MakkaPakka518/WFSN/refs/heads/main/widgetsns/miss.js"
-    },
-    {
       "id": "Pornhub_int",
       "title": "Pornhub",
       "description": "網路收集到的模塊",
