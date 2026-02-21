@@ -148,7 +148,7 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/imdb.js"
     },
     {
-      "id": "vod_max_engine_v1",
+      "id": "vod_max_engine_makka",
       "title": "VOD资源聚合",
       "description": "内置海量采集接口（含18+）",
       "requiredVersion": "0.0.1",
