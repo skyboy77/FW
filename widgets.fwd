@@ -40,6 +40,15 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/trakt.js"
     },
     {
+      "id": "tmdb_upcoming_center_makka",
+      "title": "即将上映与热映榜",
+      "description": "追踪院线即将上映的电影与最新剧集，热度显示，不错过任何一部大片",
+      "requiredVersion": "0.0.1",
+      "version": "1.0.0",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/redu.js"
+    },
+    {
       "id": "variety_hub_ultimate_v4_fix",
       "title": "全球综艺追更热度榜",
       "description": "综艺更新时间表，热度榜",
