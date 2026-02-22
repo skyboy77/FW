@@ -1,6 +1,7 @@
 /**
- * VOD 直链嗅探引擎 (竞速秒出版)
- * 核心优化: 引入抢答竞速机制。只要凑齐 5 个源或达到 3.5 秒超时，立即向 FW 渲染结果，告别死等。
+ * VOD 直链嗅探引擎 (完美平衡版)
+ * 修复: 延长 CMS 接口请求时间至 10 秒，加入 12 秒硬超时，搜集满 8 个线路立刻返回。
+ * 恢复: multiSource 启用/禁用开关。
  */
 
 // ================= 1. 默认资源站配置 (完整 56 个普通源) =================
@@ -70,14 +71,23 @@ const CHINESE_NUM_MAP = {
 
 // ================= 2. 模块元数据定义 =================
 WidgetMetadata = {
-  id: "vod_stream_aggregator_fast",
-  title: "万能嗅探引擎 (竞速版)",
+  id: "vod_stream_ag11gregator_balanced",
+  title: "万能嗅探引擎 (平衡版)",
   icon: "https://assets.vvebo.vip/scripts/icon.png",
-  version: "3.0.0",
+  version: "3.1.0",
   requiredVersion: "0.0.1",
-  description: "采用抢答机制，凑齐5个源或3秒即出结果，告别死等转圈！",
+  description: "采用智能抢答机制，兼容慢速源，最长等待12秒或凑齐8个源秒出。",
   author: "编码助手",
   globalParams: [
+    {
+      name: "multiSource",
+      title: "是否启用聚合搜索",
+      type: "enumeration",
+      enumOptions: [
+        { title: "启用", value: "enabled" },
+        { title: "禁用", value: "disabled" }
+      ]
+    },
     {
       name: "customSites",
       title: "资源站配置 (名称,URL 一行一个)",
@@ -130,8 +140,10 @@ const isM3U8 = (url) => url?.toLowerCase().includes('.m3u8') || false;
 // ================= 4. 核心：竞速提取逻辑 =================
 
 async function loadResource(params) {
-  const { seriesName, type = 'movie', season, episode, customSites } = params;
-  if (!seriesName) return [];
+  const { seriesName, type = 'movie', season, episode, customSites, multiSource } = params;
+  
+  // 恢复配置开关：如果用户禁用了聚合，直接返回空
+  if (multiSource === "disabled" || !seriesName) return [];
 
   const sites = parseSites(customSites);
   const targetInfo = extractSeasonInfo(seriesName);
@@ -150,28 +162,28 @@ async function loadResource(params) {
     // 裁判检查函数：是否满足返回条件
     const checkAndResolve = () => {
       if (isResolved) return;
-      // 只要收集到 5 个播放源，或者全部执行完了，立刻吹哨返回！
-      if (allResources.length >= 5 || completedTasks === sites.length) {
+      // 策略调整：只要凑齐 8 个播放源，或者全部源都执行完了，立刻吹哨返回！
+      if (allResources.length >= 8 || completedTasks === sites.length) {
         isResolved = true;
         resolve(allResources);
       }
     };
 
-    // 极限硬超时保护：最多等 3.5 秒。时间一到，手上有几个就算几个，立刻返回！
+    // 极限硬超时保护：最多等 12 秒。时间一到，手上有几个就算几个，立刻返回！
     setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
-        console.log(`[竞速保护] 3.5秒超时，直接返回已拿到的 ${allResources.length} 个资源`);
+        console.log(`[竞速保护] 12秒硬超时，直接返回已拿到的 ${allResources.length} 个资源`);
         resolve(allResources);
       }
-    }, 3500);
+    }, 12000);
 
     // 56 名选手（资源站）同时起跑
     sites.forEach(async (site) => {
       try {
         const res = await Widget.http.get(site.url, {
           params: { ac: "detail", wd: targetBaseName, out: "json" },
-          timeout: 3000 // 给每个源的时间也很苛刻，3秒连不上就淘汰
+          timeout: 10000 // 给每个源充足的 10 秒钟去响应
         });
         
         if (isResolved) return; // 如果比赛已经结束，选手跑到终点也不计入了
