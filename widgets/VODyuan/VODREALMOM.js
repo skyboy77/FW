@@ -29,14 +29,14 @@ const CHINESE_NUM_MAP = {
 };
 
 WidgetMetadata = {
-  id: "vod_mom111stream",
-  title: "VOD Stream (21源极速版)",
-  icon: "https://assets.vvebo.vip/scripts/icon.png",
-  version: "1.2.3",
+  id: "vod_realmom",
+  title: "VOD 播放源",
+  icon: "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/tubiao/makka.png",
+  version: "1.0.3",
   requiredVersion: "0.0.1",
-  description: "获取聚合VOD影片资源(精简至21个高存活率极速源)",
-  author: "两块 (助手精简提速)",
-  site: "https://github.com/2kuai/ForwardWidgets",
+  description: "获取VOD播放资源(内含21个VOD源)",
+  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+  site: "https://github.com/MakkaPakka518/FW",
   globalParams: [
     {
       name: "multiSource",
