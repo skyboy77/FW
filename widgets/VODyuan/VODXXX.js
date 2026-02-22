@@ -1,5 +1,5 @@
 // --- 56个精选普通源 ---
-const DEFAULT_SITES = `
+const RESOURCE_SITES = `
 非凡资源,http://ffzy5.tv/api.php/provide/vod/
 卧龙资源,https://wolongzyw.com/api.php/provide/vod/
 最大资源,https://api.zuidapi.com/api.php/provide/vod/
@@ -10,13 +10,14 @@ const DEFAULT_SITES = `
 如意资源,https://cj.rycjapi.com/api.php/provide/vod/
 红牛资源,https://www.hongniuzy2.com/api.php/provide/vod/
 光速资源,https://api.guangsuapi.com/api.php/provide/vod/
-IKUN资源,https://ikunzyapi.com/api.php/provide/vod/
+iKun资源,https://ikunzyapi.com/api.php/provide/vod/
 优酷资源,https://api.ukuapi.com/api.php/provide/vod/
 虎牙资源,https://www.huyaapi.com/api.php/provide/vod/
 新浪资源,http://api.xinlangapi.com/xinlangapi.php/provide/vod/
 乐子资源,https://cj.lziapi.com/api.php/provide/vod/
 鲸鱼资源,https://jyzyapi.com/provide/vod/
 爱蛋资源,https://lovedan.net/api.php/provide/vod/
+卧龙采集,https://collect.wolongzyw.com/api.php/provide/vod/
 茅台资源,https://caiji.maotaizy.cc/api.php/provide/vod/
 豆瓣资源,https://dbzy.tv/api.php/provide/vod/
 速博资源,https://subocaiji.com/api.php/provide/vod/
@@ -29,8 +30,8 @@ const CHINESE_NUM_MAP = {
 };
 
 WidgetMetadata = {
-  id: "vod_momstr1234eam",
-  title: "VOD Stream (1234)",
+  id: "vod_momsgsgstream",
+  title: "VOD Stream (123源版)",
   icon: "https://assets.vvebo.vip/scripts/icon.png",
   version: "1.2.2",
   requiredVersion: "0.0.1",
