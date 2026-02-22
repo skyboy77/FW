@@ -1,67 +1,31 @@
 /**
- * VOD 直链嗅探引擎 (完美平衡版)
- * 修复: 延长 CMS 接口请求时间至 10 秒，加入 12 秒硬超时，搜集满 8 个线路立刻返回。
- * 恢复: multiSource 启用/禁用开关。
+ * VOD 直链嗅探引擎 (精简提速版)
+ * 核心：保留优秀的竞速机制，移除了超时和失效的冗余节点，仅保留 21 个极速主力源。
  */
 
-// ================= 1. 默认资源站配置 (完整 56 个普通源) =================
+// ================= 1. 默认资源站配置 (精简为 21 个高速源) =================
 const DEFAULT_SITES = `
 非凡资源,http://ffzy5.tv/api.php/provide/vod/
 卧龙资源,https://wolongzyw.com/api.php/provide/vod/
 最大资源,https://api.zuidapi.com/api.php/provide/vod/
-百度云资源,https://api.apibdzy.com/api.php/provide/vod/
 暴风资源,https://bfzyapi.com/api.php/provide/vod/
 极速资源,https://jszyapi.com/api.php/provide/vod/
-天涯资源,https://tyyszy.com/api.php/provide/vod/
 无尽资源,https://api.wujinapi.com/api.php/provide/vod/
-魔都资源,https://www.mdzyapi.com/api.php/provide/vod/
-360资源,https://360zy.com/api.php/provide/vod/
 电影天堂,http://caiji.dyttzyapi.com/api.php/provide/vod/
 如意资源,https://cj.rycjapi.com/api.php/provide/vod/
-旺旺资源,https://wwzy.tv/api.php/provide/vod/
 红牛资源,https://www.hongniuzy2.com/api.php/provide/vod/
 光速资源,https://api.guangsuapi.com/api.php/provide/vod/
-iKun资源,https://ikunzyapi.com/api.php/provide/vod/
+IKUN资源,https://ikunzyapi.com/api.php/provide/vod/
 优酷资源,https://api.ukuapi.com/api.php/provide/vod/
 虎牙资源,https://www.huyaapi.com/api.php/provide/vod/
 新浪资源,http://api.xinlangapi.com/xinlangapi.php/provide/vod/
 乐子资源,https://cj.lziapi.com/api.php/provide/vod/
-海豚资源,https://hhzyapi.com/api.php/provide/vod/
 鲸鱼资源,https://jyzyapi.com/provide/vod/
 爱蛋资源,https://lovedan.net/api.php/provide/vod/
-魔都影视,https://www.moduzy.com/api.php/provide/vod/
-非凡API,https://api.ffzyapi.com/api.php/provide/vod/
-非凡采集,http://cj.ffzyapi.com/api.php/provide/vod/
-非凡采集HTTPS,https://cj.ffzyapi.com/api.php/provide/vod/
-非凡线路1,http://ffzy1.tv/api.php/provide/vod/
-卧龙采集,https://collect.wolongzyw.com/api.php/provide/vod/
-暴风APP,https://app.bfzyapi.com/api.php/provide/vod/
-无尽ME,https://api.wujinapi.me/api.php/provide/vod/
-天涯海角,https://tyyszyapi.com/api.php/provide/vod/
-光速HTTP,http://api.guangsuapi.com/api.php/provide/vod/
-新浪HTTPS,https://api.xinlangapi.com/xinlangapi.php/provide/vod/
-1080JSON,https://api.1080zyku.com/inc/apijson.php
-乐子HTTP,http://cj.lziapi.com/api.php/provide/vod/
-U酷资源88,https://api.ukuapi88.com/api.php/provide/vod/
-无尽CC,https://api.wujinapi.cc/api.php/provide/vod/
-丫丫点播,https://cj.yayazy.net/api.php/provide/vod/
-卧龙CC,https://collect.wolongzy.cc/api.php/provide/vod/
-无尽NET,https://api.wujinapi.net/api.php/provide/vod/
-旺旺API,https://api.wwzy.tv/api.php/provide/vod/
-最大点播,http://zuidazy.me/api.php/provide/vod/
-樱花资源,https://m3u8.apiyhzy.com/api.php/provide/vod/
-步步高资源,https://api.yparse.com/api/json
-牛牛点播,https://api.niuniuzy.me/api.php/provide/vod/
-索尼资源,https://suoniapi.com/api.php/provide/vod/
 茅台资源,https://caiji.maotaizy.cc/api.php/provide/vod/
 豆瓣资源,https://dbzy.tv/api.php/provide/vod/
 速博资源,https://subocaiji.com/api.php/provide/vod/
-金鹰点播,https://jinyingzy.com/api.php/provide/vod/
-閃電资源,https://sdzyapi.com/api.php/provide/vod/
 飘零资源,https://p2100.net/api.php/provide/vod/
-魔都动漫,https://caiji.moduapi.cc/api.php/provide/vod/
-红牛资源3,https://www.hongniuzy3.com/api.php/provide/vod/
-索尼-闪电,https://xsd.sdzyapi.com/api.php/provide/vod/
 `;
 
 const CHINESE_NUM_MAP = {
@@ -71,12 +35,12 @@ const CHINESE_NUM_MAP = {
 
 // ================= 2. 模块元数据定义 =================
 WidgetMetadata = {
-  id: "vod_stream_ag11gregator_balanced",
-  title: "万能嗅探引擎 (平衡版)",
+  id: "vod_stream_a123ggregator_fast",
+  title: "万能嗅探引擎 (精简提速版)",
   icon: "https://assets.vvebo.vip/scripts/icon.png",
-  version: "3.1.0",
+  version: "4.0.0",
   requiredVersion: "0.0.1",
-  description: "采用智能抢答机制，兼容慢速源，最长等待12秒或凑齐8个源秒出。",
+  description: "保留竞速逻辑，剔除死链，内置21个高速主力源，体验秒开。",
   author: "编码助手",
   globalParams: [
     {
@@ -162,14 +126,14 @@ async function loadResource(params) {
     // 裁判检查函数：是否满足返回条件
     const checkAndResolve = () => {
       if (isResolved) return;
-      // 策略调整：只要凑齐 8 个播放源，或者全部源都执行完了，立刻吹哨返回！
+      // 只要凑齐 8 个播放源，或者全部执行完了（21个源很快就能跑完），立刻吹哨返回！
       if (allResources.length >= 8 || completedTasks === sites.length) {
         isResolved = true;
         resolve(allResources);
       }
     };
 
-    // 极限硬超时保护：最多等 12 秒。时间一到，手上有几个就算几个，立刻返回！
+    // 极限硬超时保护：最多等 12 秒。
     setTimeout(() => {
       if (!isResolved) {
         isResolved = true;
@@ -178,7 +142,7 @@ async function loadResource(params) {
       }
     }, 12000);
 
-    // 56 名选手（资源站）同时起跑
+    // 所有选手（资源站）同时起跑
     sites.forEach(async (site) => {
       try {
         const res = await Widget.http.get(site.url, {
@@ -186,7 +150,7 @@ async function loadResource(params) {
           timeout: 10000 // 给每个源充足的 10 秒钟去响应
         });
         
-        if (isResolved) return; // 如果比赛已经结束，选手跑到终点也不计入了
+        if (isResolved) return; // 比赛结束，后面的选手数据不计入
 
         let data = typeof res.data === "string" ? JSON.parse(res.data) : res.data;
         const list = data.list || [];
@@ -242,10 +206,10 @@ async function loadResource(params) {
           }
         }
       } catch (err) {
-        // 请求失败、超时直接淘汰静默
+        // 请求失败、超时直接淘汰
       } finally {
         completedTasks++;
-        checkAndResolve(); // 每位选手跑完都去向裁判报备
+        checkAndResolve(); // 跑完向裁判报备
       }
     });
   });
