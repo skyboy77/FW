@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.1.8", // 🚀 避坑版：替换短横线，绕过系统年份截断机制，采用全新符号分隔排版
+    version: "1.1.9", // 🚀 强迫症终极版：将类型精准填入 genreTitle，完美对接横版的类型拼接点
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -181,7 +181,6 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 const s = epData.season_number;
                 const e = epData.episode_number;
                 
-                // 👇 全新格式拼接，绕开系统截断，变成：2026/S1•E2/2.23
                 displayStr = `${yearStr}/S${s}•E${e}/${month}.${day}`;
             }
 
@@ -191,8 +190,10 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 type: "tmdb", 
                 mediaType: "tv", 
                 title: d.name, 
-                genreTitle: "", 
-                subTitle: genreStr, 
+                // 👇 把类型填入 genreTitle，完美对接横版的系统拼接！
+                genreTitle: genreStr, 
+                // 👇 subTitle 置空，防止系统又搞出什么幺蛾子拼接
+                subTitle: "", 
                 releaseDate: displayStr, 
                 year: yearStr, 
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
@@ -246,8 +247,9 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            genreTitle: "", 
-            subTitle: genre,
+            // 👇 这里也同步修正，确保常规列表横版表现也一致
+            genreTitle: genre, 
+            subTitle: "",
             releaseDate: fullDate,       
             year: year, 
             description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
