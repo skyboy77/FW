@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全球综艺追更热度榜",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "综艺更新时间表，热度榜",
-    version: "2.0.3",
+    version: "2.0.4", // 更新版本号
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -11,7 +11,7 @@ WidgetMetadata = {
         {
             title: "综艺聚合",
             functionName: "loadVarietyUltimate",
-            type: "list",
+            type: "list", // 此处横竖版切换测试均可兼容
             cacheDuration: 300, 
             params: [
                 {
@@ -57,19 +57,14 @@ WidgetMetadata = {
 // 0. 工具函数
 // =========================================================================
 
-// 格式化日期 MM-30
-function formatShortDate(dateStr) {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const d = date.getDate().toString().padStart(2, '0');
-    return `${m}-${d}`;
+// 辅助函数：将个位数补零，例如 1 -> 01
+function padZero(num) {
+    return String(num).padStart(2, '0');
 }
 
 // 获取今天 (YYYY-MM-DD) - 用于比较
 function getTodayStr() {
     const d = new Date();
-    // 简单粗暴处理时区，确保取到的是当前用户所在日期的字符串
     const offset = d.getTimezoneOffset() * 60000;
     const local = new Date(d.getTime() - offset);
     return local.toISOString().split('T')[0];
@@ -91,7 +86,7 @@ function getFutureDateStr(days) {
 async function loadVarietyUltimate(params = {}) {
     const { listType = "calendar", region = "all", days = "14", page = 1 } = params;
 
-    const todayStr = getTodayStr(); // 获取今天的日期字符串 (2026-01-30)
+    const todayStr = getTodayStr(); // 获取今天的日期字符串 (2026-02-23)
 
     let discoverUrl = `/discover/tv`;
     let queryParams = {
@@ -135,23 +130,21 @@ async function loadVarietyUltimate(params = {}) {
                 const lastEp = detail.last_episode_to_air;
                 
                 let sortDate = "1900-01-01"; 
-                let displayInfoStr = ""; 
+                let epString = ""; 
 
-                // 逻辑：找到最接近未来的那一集
+                // 逻辑：找到最接近未来的那一集，并组装 S01-E03
                 if (nextEp) {
                     sortDate = nextEp.air_date;
-                    displayInfoStr = `${formatShortDate(sortDate)} S${nextEp.season_number}E${nextEp.episode_number}`;
+                    epString = `S${padZero(nextEp.season_number)}-E${padZero(nextEp.episode_number)}`;
                 } else if (lastEp) {
                     sortDate = lastEp.air_date;
-                    displayInfoStr = `${formatShortDate(sortDate)} S${lastEp.season_number}E${lastEp.episode_number}`;
+                    epString = `S${padZero(lastEp.season_number)}-E${padZero(lastEp.episode_number)}`;
                 } else {
                     sortDate = item.first_air_date;
-                    displayInfoStr = `${formatShortDate(sortDate)} 首播`;
+                    epString = "首播";
                 }
 
-                // === 🛑 步骤2：最终强制过滤 (The Strict Gatekeeper) ===
-                // 无论这一集是 next 还是 last，只要它的日期 < 今天，直接扔掉。
-                // 这样就能干掉 "01-29" 这种昨天的数据
+                // === 🛑 步骤2：最终强制过滤 ===
                 if (listType === "calendar") {
                     if (!sortDate || sortDate < todayStr) {
                         return null; 
@@ -161,7 +154,7 @@ async function loadVarietyUltimate(params = {}) {
                 return {
                     detail: detail,
                     sortDate: sortDate,
-                    displayInfoStr: displayInfoStr
+                    epString: epString
                 };
             } catch (e) {
                 return null;
@@ -179,18 +172,23 @@ async function loadVarietyUltimate(params = {}) {
         }
 
         return detailedItems.map(data => {
-            const { detail, displayInfoStr, sortDate } = data;
+            const { detail, epString, sortDate } = data;
             
-            let finalGenreTitle = "";
+            const ratingNum = detail.vote_average ? detail.vote_average.toFixed(1) : "0.0";
+            const ratingText = ratingNum > 0 ? `${ratingNum}分` : "暂无评分";
+            
             let finalSubTitle = "";
 
             if (listType === "calendar") {
-                finalGenreTitle = displayInfoStr; 
-                finalSubTitle = displayInfoStr;   
+                // 生成副标题：8.5分 • S01-E03
+                finalSubTitle = `${ratingText} • ${epString}`;  
             } else {
-                finalGenreTitle = `${detail.vote_average.toFixed(1)}分`;
-                finalSubTitle = `🔥 热度 ${Math.round(detail.popularity)}`;
+                // 热度榜副标题
+                finalSubTitle = `${ratingText} • 热度 ${Math.round(detail.popularity)}`;
             }
+
+            // 提取年份，用当前播出的这集的年份
+            const yearStr = sortDate ? sortDate.substring(0, 4) : (detail.first_air_date || "").substring(0, 4);
 
             return {
                 id: String(detail.id),
@@ -198,13 +196,19 @@ async function loadVarietyUltimate(params = {}) {
                 type: "tmdb",
                 mediaType: "tv",
                 title: detail.name || detail.original_name,
-                genreTitle: finalGenreTitle, 
+                
+                // 给横版的副标题
+                genreTitle: finalSubTitle, 
                 subTitle: finalSubTitle,
+                
                 posterPath: detail.poster_path ? `https://image.tmdb.org/t/p/w500${detail.poster_path}` : "",
                 backdropPath: detail.backdrop_path ? `https://image.tmdb.org/t/p/w780${detail.backdrop_path}` : "",
                 description: `📅 播出时间: ${sortDate}\n${detail.overview || "暂无简介"}`,
-                rating: detail.vote_average ? detail.vote_average.toFixed(1) : "0.0",
-                year: (detail.first_air_date || "").substring(0, 4)
+                rating: parseFloat(ratingNum),
+                
+                // 核心字段回归
+                year: yearStr,           // 负责横版榜单前面拼接的年份："2026"
+                releaseDate: sortDate    // 负责竖版海报下方显示的完整日期："2026-02-23"
             };
         });
 
