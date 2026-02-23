@@ -3,13 +3,14 @@ WidgetMetadata = {
     title: "全能电影榜",
     description: "提供流行、高分、年度最佳以及按类型探索电影",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.1.0", // 版本号小幅升级
+    version: "1.3.0", // 更新版本号
     requiredVersion: "0.0.1",
     modules: [
         {
             title: "电影榜单",
             functionName: "loadMovieList",
-            type: "list",
+            // --- 核心修正 1：改用 video 类型以获得更好的影视元数据排版支持 ---
+            type: "video", 
             cacheDuration: 3600,
             params: [
                 // --- 一级菜单：主分类 ---
@@ -77,7 +78,6 @@ WidgetMetadata = {
 
 // ================= 逻辑处理部分 =================
 
-// 类型映射表
 const GENRE_MAP = {
     28: "动作", 12: "冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
     18: "剧情", 10751: "家庭", 14: "奇幻", 36: "历史", 27: "恐怖", 10402: "音乐",
@@ -85,27 +85,19 @@ const GENRE_MAP = {
     10752: "战争", 37: "西部", 10759: "动作冒险"
 };
 
-// 提取类型的中文名称
 function getGenreText(ids) {
-    if (!ids || !Array.isArray(ids)) return "";
-    // 最多取前 3 个类型，用 " / " 分隔，保持 UI 干净
-    return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
+    if (!ids || !Array.isArray(ids)) return "电影";
+    const genres = ids.map(id => GENRE_MAP[id]).filter(Boolean);
+    return genres.length > 0 ? genres.slice(0, 2).join(" / ") : "电影";
 }
 
-// 统一的数据格式化函数 (核心修复区)
+// --- 核心修正 2：完全对齐参考代码的字段结构 ---
 function buildItem(item) {
     if (!item) return null;
     
-    // 提取完整日期 (YYYY-MM-DD) 和 年份 (YYYY)
     const releaseDate = item.release_date || "";
-    const year = releaseDate.substring(0, 4);
-    
     const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
     const genreText = getGenreText(item.genre_ids);
-
-    // 组合副标题：兼顾图1(日期)与图3(类型)的需求，例如 "2026-01-16 · 科幻 / 动作"
-    // 如果没有日期，就只显示类型
-    const subTitleText = releaseDate ? `${releaseDate} · ${genreText}` : genreText;
 
     return {
         id: String(item.id),
@@ -114,19 +106,20 @@ function buildItem(item) {
         mediaType: "movie",
         title: item.title,
         
-        // 【关键修复 1】统一规范化副标题，使横竖版都能清晰看到播出时间与类型
-        subTitle: subTitleText,
+        // 修正 A：只留类型标签，不要手动加年份。Forward 会在横版时自动把年份加上。
+        genreTitle: genreText,
         
-        // 【关键修复 2】竖版海报字段 (w500分辨率兼顾清晰与加载速度)
-        coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
+        // 修正 B：竖版海报下方读取的是 description，我们把日期和评分放这里
+        description: releaseDate ? `${releaseDate} · ⭐ ${score}` : `⭐ ${score}`,
         
-        // 【关键修复 3】将 backdropPath 更正为 Forward 标准字段 backdropUrl
-        // 这样当 UI 切换为横版时，引擎会自动抓取这张横向剧照，不再拉伸
-        backdropUrl: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
+        // 修正 C：传给内核的日期字段，内核会自动提取年份给横版 UI
+        releaseDate: releaseDate,
         
-        description: item.overview,
-        rating: parseFloat(score),
-        year: year
+        // 修正 D：使用与参考代码一致的图片字段名
+        posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
+        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
+        
+        rating: parseFloat(score)
     };
 }
 
@@ -142,7 +135,6 @@ async function loadMovieList(params) {
             page: page 
         };
 
-        // 根据下拉菜单的选择，动态匹配请求参数
         if (category === "popular") {
             endpoint = "/movie/popular";
         } else if (category === "top_rated") {
