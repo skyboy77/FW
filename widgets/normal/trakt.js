@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.2.0", // 🚀 终极修复：利用系统自身查重逻辑，根治横版前缀乱码
+    version: "1.2.1", // 🚀 格式大改版：采用 2025•S01E03•2/24 彻底根治前缀乱码
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -62,14 +62,6 @@ WidgetMetadata = {
 // ==========================================
 
 const DEFAULT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482"; 
-
-function formatShortDate(dateStr) {
-    if (!dateStr) return "待定";
-    const date = new Date(dateStr);
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const d = date.getDate().toString().padStart(2, '0');
-    return `${m}-${d}`;
-}
 
 // ==========================================
 // 1. 主逻辑
@@ -174,14 +166,23 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
         return valid.slice(start, start + 15).map(item => {
             const d = item.tmdb;
             let displayStr = "暂无排期";
-            let shortDateStr = "";
+            let yearStr = "";
             let epData = d.next_episode_to_air || d.last_episode_to_air;
 
             if (epData) {
-                shortDateStr = formatShortDate(epData.air_date); // 例如: 02-24
+                const airDate = epData.air_date; // 例如 "2025-02-24"
+                yearStr = airDate.substring(0, 4); // 提取 2025
+                
+                // 提取月和日，并去掉前导零 (变成 2/24)
+                const month = parseInt(airDate.substring(5, 7), 10);
+                const day = parseInt(airDate.substring(8, 10), 10);
+                
+                // 提取季和集
                 const s = String(epData.season_number).padStart(2, '0');
                 const e = String(epData.episode_number).padStart(2, '0');
-                displayStr = `${shortDateStr}•S${s}-E${e}`; // 例如: 02-24•S01-E08
+                
+                // 组装成终极格式：2025•S01E03•2/24
+                displayStr = `${yearStr}•S${s}E${e}•${month}/${day}`;
             }
 
             return {
@@ -193,7 +194,7 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 genreTitle: displayStr,
                 subTitle: displayStr,
                 releaseDate: displayStr, 
-                year: shortDateStr, // 🚀 骗过系统的关键！告诉它前缀就是 02-24，阻止它自动乱加
+                year: yearStr, // 明确传完整的 4 位年份，满足系统强迫症
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
                 description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
             };
@@ -239,7 +240,7 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
         const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
         
         const fullDate = d.first_air_date || d.release_date || "";
-        const year = fullDate.substring(0, 4); // 真实年份
+        const year = fullDate.substring(0, 4); 
         const genre = d.genres && d.genres.length > 0 ? d.genres[0].name : "影视";
         const horizontalText = year ? `${year}•${genre}` : genre;
 
@@ -249,7 +250,7 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
             genreTitle: horizontalText,  
             subTitle: horizontalText,
             releaseDate: fullDate,       
-            year: year, // 🚀 恢复原真实年份，这会触发防重逻辑，保证待看列表不出错
+            year: year, 
             description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
             posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
         };
