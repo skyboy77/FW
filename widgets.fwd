@@ -89,7 +89,7 @@
       "title": "探索发现 | 惊喜推荐",
       "description": "聚合【今天看什么】、【Trakt惊喜推荐】与【那年今日】、一站式发现好片。",
       "requiredVersion": "0.0.1",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/today.js"
     },
