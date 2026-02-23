@@ -3,12 +3,13 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.2.1", // 🚀 格式大改版：采用 2025•S01E03•2/24 彻底根治前缀乱码
+    version: "1.3.0", // 🚀 回调版：恢复 Client ID 选填框，满足进阶玩家需求，保留文本除虫补丁
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
     globalParams: [
         { name: "traktUser", title: "Trakt 用户名 (必填)", type: "input", value: "" },
+        // 👇 把 Client ID 输入框重新加回来啦，标记为选填
         { name: "traktClientId", title: "Trakt Client ID (选填，不填使用内置)", type: "input", value: "" }
     ],
 
@@ -68,12 +69,14 @@ const DEFAULT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e
 // ==========================================
 
 async function loadTraktProfile(params = {}) {
+    // 👇 获取传入的 traktClientId
     const { traktUser, traktClientId, section, updateSort = "future_first", type = "all", page = 1 } = params;
 
     if (!traktUser) {
         return [{ id: "err", type: "text", title: "请填写 Trakt 用户名" }];
     }
     
+    // 👇 核心逻辑：用户填了就用用户的，没填就用内置的
     const finalClientId = traktClientId || DEFAULT_CLIENT_ID;
 
     // === A. 追剧日历 (Updates) ===
@@ -170,18 +173,15 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
             let epData = d.next_episode_to_air || d.last_episode_to_air;
 
             if (epData) {
-                const airDate = epData.air_date; // 例如 "2025-02-24"
-                yearStr = airDate.substring(0, 4); // 提取 2025
+                const airDate = epData.air_date; 
+                yearStr = airDate.substring(0, 4); 
                 
-                // 提取月和日，并去掉前导零 (变成 2/24)
                 const month = parseInt(airDate.substring(5, 7), 10);
                 const day = parseInt(airDate.substring(8, 10), 10);
                 
-                // 提取季和集
                 const s = String(epData.season_number).padStart(2, '0');
                 const e = String(epData.episode_number).padStart(2, '0');
                 
-                // 组装成终极格式：2025•S01E03•2/24
                 displayStr = `${yearStr}•S${s}E${e}•${month}/${day}`;
             }
 
@@ -191,10 +191,11 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 type: "tmdb", 
                 mediaType: "tv", 
                 title: d.name, 
-                genreTitle: displayStr,
+                // 继续保持置空，防止重影
+                genreTitle: "", 
                 subTitle: displayStr,
-                releaseDate: displayStr, 
-                year: yearStr, // 明确传完整的 4 位年份，满足系统强迫症
+                releaseDate: "", 
+                year: yearStr, 
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
                 description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
             };
@@ -247,7 +248,7 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            genreTitle: horizontalText,  
+            genreTitle: "", // 保持防重影
             subTitle: horizontalText,
             releaseDate: fullDate,       
             year: year, 
