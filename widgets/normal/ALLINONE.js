@@ -9,13 +9,13 @@ WidgetMetadata = {
     title: "全球影视平台ALL IN ONE",
     description: "全网最全的频道聚合：覆盖爱优腾、网飞、HBO、韩国tvN及各大卫视",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.2.0", // 🚀 升级：引入防截断与双海报极简排版规范
+    version: "1.2.1", // 🚀 升级：引入防截断与双海报极简排版规范
     requiredVersion: "0.0.1",
     modules: [
         {
             title: "全网热播发现",
             functionName: "loadPlatformList",
-            type: "list",
+            type: "video", // 🔑 核心魔法 1：必须是 video 才能触发完美的横竖版自适应
             cacheDuration: 3600,
             params: [
                 {
@@ -74,17 +74,6 @@ WidgetMetadata = {
                         { title: "🏆 TMDB 高分榜", value: "top" }
                     ]
                 },
-                // 👇 新增：强制海报排版选择，让框架乖乖听话
-                {
-                    name: "layout",
-                    title: "海报排版 (适配前端)",
-                    type: "enumeration",
-                    value: "vertical",
-                    enumOptions: [
-                        { title: "🖼️ 竖向排版 (2:3海报)", value: "vertical" },
-                        { title: "🖥️ 横向排版 (16:9剧照)", value: "horizontal" }
-                    ]
-                },
                 { name: "page", title: "页码", type: "page", startPage: 1 }
             ]
         }
@@ -133,8 +122,7 @@ function getGenreText(ids) {
     return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
 }
 
-// 接收 layout 参数，强行分配主海报
-function buildItem(item, isMovie, platformName, layout) {
+function buildItem(item, isMovie, platformName) {
     if (!item) return null;
     
     const mediaType = isMovie ? "movie" : "tv";
@@ -147,28 +135,24 @@ function buildItem(item, isMovie, platformName, layout) {
     if (item.genre_ids?.includes(16)) typeTag = "🐰";
     if (item.genre_ids?.includes(10764) || item.genre_ids?.includes(10767)) typeTag = "🎤";
 
-    // 获取 TMDB 原图
-    const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "";
-    const backdrop = item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "";
-    
-    // 👇 核心修复：根据选定的排版模式，把正确的图片喂给主字段 coverUrl，避免前端不识别
-    const displayCover = (layout === "horizontal") ? (backdrop || poster) : (poster || backdrop);
-
     return {
         id: String(item.id),
         tmdbId: parseInt(item.id),
-        type: "tmdb", 
+        type: "video", // 或者 tmdb，取决于底层跳转要求，通常外层定义了即可
         mediaType: mediaType,
         title: title,
         
+        // 🔑 核心魔法 2：交给框架去提取年份，我们只管传全量日期和干净的类型
         releaseDate: releaseDate, 
         genreTitle: genreText,    
         subTitle: "",             
         
-        // 现在 coverUrl 绝对是正确的横/竖向图片了
-        coverUrl: displayCover, 
+        // 提供双海报弹药库，让 type="video" 自己去挑
+        coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "", 
+        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "", 
         
-        description: `${typeTag} ${platformName} | ⭐ ${score}\n${item.overview || "暂无简介"}`,
+        // 🔑 核心魔法 3：利用 description 渲染竖版模式下方的小字
+        description: `${typeTag} ${platformName} | ⭐ ${score}`,
         rating: item.vote_average || 0
     };
 }
@@ -179,7 +163,6 @@ async function loadPlatformList(params) {
     const platform = params.platform || "netflix";
     const mediaType = params.mediaType || "tv";
     const category = params.sortBy || "hot";
-    const layout = params.layout || "vertical"; // 提取排版参数
     const page = params.page || 1;
 
     const today = new Date().toISOString().split('T')[0];
@@ -231,8 +214,7 @@ async function loadPlatformList(params) {
 
     try {
         const res = await Widget.tmdb.get(endpoint, { params: queryParams });
-        // 将 layout 参数传进 buildItem 处理海报
-        const items = (res.results || []).map(i => buildItem(i, isMovie, platformConfig.name, layout)).filter(Boolean);
+        const items = (res.results || []).map(i => buildItem(i, isMovie, platformConfig.name)).filter(Boolean);
 
         if (items.length === 0) {
              return [{ id: "empty", type: "text", title: "无数据", description: `在 [${platformConfig.name}] 暂未找到符合该条件的影视记录` }];
