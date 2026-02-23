@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "影迷宝藏 | 系列与流派",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合【系列电影大满贯】与【趣味流派探索】，一键补番，探索未知。",
-    version: "1.0.3",
+    version: "1.0.4", // 小幅升级版本号
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -17,7 +17,8 @@ WidgetMetadata = {
         {
             title: "系列电影大满贯",
             functionName: "loadFranchise",
-            type: "list",
+            // --- 核心修复 1：改为 video 类型 ---
+            type: "video", 
             cacheDuration: 3600,
             params: [
                 {
@@ -73,7 +74,8 @@ WidgetMetadata = {
         {
             title: "趣味流派探索",
             functionName: "loadNicheGenre",
-            type: "list",
+            // --- 核心修复 1：改为 video 类型 ---
+            type: "video", 
             cacheDuration: 3600,
             params: [
                 {
@@ -114,7 +116,9 @@ WidgetMetadata = {
                         { title: "评分最高", value: "vote_average.desc" },
                         { title: "最新上映", value: "primary_release_date.desc" }
                     ]
-                }
+                },
+                // --- 新增：给流派探索加上翻页，体验更好 ---
+                { name: "page", title: "页码", type: "page", startPage: 1 }
             ]
         }
     ]
@@ -137,20 +141,27 @@ function getGenreText(ids) {
     return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
 }
 
-function buildItem({ id, tmdbId, type, title, year, poster, backdrop, rating, genreText, subTitle, desc }) {
+// --- 核心修复 2：统一格式化函数，适配 video 类型的横竖版排版 ---
+function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, genreText }) {
     return {
         id: String(id),
         tmdbId: parseInt(tmdbId),
         type: "tmdb",
         mediaType: type,
         title: title,
-        genreTitle: [year, genreText].filter(Boolean).join(" • "), 
-        subTitle: subTitle,
+        
+        // 横版：只保留类型，不要手动加年份，内核会自动拼
+        genreTitle: genreText || (type === "tv" ? "剧集" : "电影"), 
+        
+        // 竖版：副标题显示具体日期 (YYYY-MM-DD) 和评分
+        description: date ? `${date} · ⭐ ${rating}` : `⭐ ${rating}`, 
+        
+        // 给横版提取年份用的完整日期
+        releaseDate: date,
+        
         posterPath: poster ? `https://image.tmdb.org/t/p/w500${poster}` : "",
         backdropPath: backdrop ? `https://image.tmdb.org/t/p/w780${backdrop}` : "",
-        description: desc || "暂无简介",
-        rating: rating,
-        year: year
+        rating: parseFloat(rating) || 0
     };
 }
 
@@ -168,16 +179,12 @@ async function loadFranchise(params = {}) {
     if (presetId === "custom") {
         if (!customQuery) return [{ id: "err_no_q", type: "text", title: "请输入搜索词" }];
         
-        console.log(`[Collection] Searching: ${customQuery}`);
         const searchResult = await searchCollection(customQuery);
-        
         if (!searchResult) return [{ id: "err_404", type: "text", title: "未找到合集", subTitle: `TMDB 中没有 "${customQuery}" 的官方系列合集` }];
         
         collectionId = searchResult.id;
         collectionName = searchResult.name;
     }
-
-    console.log(`[Collection] Fetching ID: ${collectionId}`);
 
     // 2. 获取合集 (免 Key)
     try {
@@ -194,30 +201,28 @@ async function loadFranchise(params = {}) {
             const dateB = b.release_date ? new Date(b.release_date) : new Date("2099-01-01");
             return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
         });
-
-        // 4. 格式化
-        const finalName = data.name || collectionName || "系列合集";
         
+        // 4. 格式化
         return movies.map((item, index) => {
-            const year = (item.release_date || "").substring(0, 4);
+            const date = item.release_date || "";
             const rank = index + 1;
             const genreText = getGenreText(item.genre_ids);
             
             return buildItem({
-                id: item.id, tmdbId: item.id, type: "movie",
-                title: `${rank}. ${item.title}`,
-                year: year,
+                id: item.id, 
+                tmdbId: item.id, 
+                type: "movie",
+                title: `${rank}. ${item.title}`, // 保留系列观看顺序编号
+                date: date,
                 poster: item.poster_path,
                 backdrop: item.backdrop_path,
                 rating: item.vote_average?.toFixed(1) || "0.0",
-                genreText: genreText,
-                subTitle: `TMDB ${item.vote_average?.toFixed(1) || 0.0}`,
-                desc: `所属: ${finalName}\n${item.overview || ""}`
+                genreText: genreText
             });
         });
 
     } catch (e) {
-        return [{ id: "err_net", type: "text", title: "请求失败", subTitle: e.message }];
+        return [{ id: "err_net", type: "text", title: "请求失败", description: e.message }];
     }
 }
 
@@ -226,14 +231,14 @@ async function loadFranchise(params = {}) {
 // =========================================================================
 
 async function loadNicheGenre(params = {}) {
-    const { themeId, mediaType = "movie", sort = "popularity.desc" } = params;
+    const { themeId, mediaType = "movie", sort = "popularity.desc", page = 1 } = params;
 
     const queryParams = {
         language: "zh-CN",
         sort_by: sort,
         include_adult: false,
         include_video: false,
-        page: 1,
+        page: page, // 添加了翻页支持
         with_keywords: themeId,
         "vote_count.gte": 50
     };
@@ -249,24 +254,25 @@ async function loadNicheGenre(params = {}) {
         if (!data.results || data.results.length === 0) return [{ id: "empty", type: "text", title: "暂无数据" }];
 
         return data.results.map(item => {
-            const year = (item.first_air_date || item.release_date || "").substring(0, 4);
+            // 兼容电影和剧集的日期字段
+            const date = item.first_air_date || item.release_date || "";
             const genreText = getGenreText(item.genre_ids);
             
             return buildItem({
-                id: item.id, tmdbId: item.id, type: mediaType,
+                id: item.id, 
+                tmdbId: item.id, 
+                type: mediaType,
                 title: item.name || item.title,
-                year: year,
+                date: date,
                 poster: item.poster_path,
                 backdrop: item.backdrop_path,
                 rating: item.vote_average?.toFixed(1) || "0.0",
-                genreText: genreText,
-                subTitle: `TMDB ${item.vote_average?.toFixed(1) || "0.0"}`,
-                desc: item.overview || `原名: ${item.original_name || item.original_title}`
+                genreText: genreText
             });
         });
 
     } catch (e) {
-        return [{ id: "err_net", type: "text", title: "网络错误", subTitle: e.message }];
+        return [{ id: "err_net", type: "text", title: "网络错误", description: e.message }];
     }
 }
 
