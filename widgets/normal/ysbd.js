@@ -1,6 +1,6 @@
 // =============UserScript=============
 // @name         影视聚合终极版 (内置Key)
-// @version      3.1.0
+// @version      3.1.1
 // @description  三合一：豆瓣全能推荐 | TMDB探索 | Trakt猜你喜欢
 // @author       Forward_User & Fix
 // =============UserScript=============
@@ -44,7 +44,7 @@ var WidgetMetadata = {
     title: "影视榜单Lite",
     description: "豆瓣全能推荐 | TMDB探索 | 猜你想看",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.0.4",
+    version: "3.1.1", // 升级版本号
     requiredVersion: "0.0.1",
 
     // 🔴 移除了所有全局参数
@@ -57,6 +57,7 @@ var WidgetMetadata = {
             title: "🟢 豆瓣",
             description: "剧集 / 电影 / 综艺 / 榜单",
             functionName: "loadDoubanModule",
+            type: "video", // 统一为 video 体验更好
             params: [
                 {
                     name: "category",
@@ -134,12 +135,6 @@ function safeJsonParse(data) {
         if (typeof data === 'object') return data;
         return JSON.parse(data);
     } catch (e) { return null; }
-}
-
-function cleanPath(path) {
-    if (!path) return undefined;
-    if (path.startsWith("/")) return path;
-    return "/" + path;
 }
 
 // 补全 TMDB 图片路径
@@ -220,16 +215,16 @@ async function loadDoubanModule(params) {
             var title = item.title;
             var year = item.year;
             var sub = item.card_subtitle || "";
-            var rate = item.rating ? item.rating.value : 0;
+            var rate = item.rating ? item.rating.value.toFixed(1) : "0.0";
             
             var tmdbItem = await searchTmdb(title, year, apiKey, isTv);
 
             if (tmdbItem) {
-                // ✅ 1. 构造 genreTitle (年份 • 类型)
+                // ✅ 提取完整日期并构造信息
                 var dateStr = tmdbItem.release_date || tmdbItem.first_air_date || (year + "");
                 var yearStr = dateStr.substring(0, 4);
                 var genreStr = getGenreString(tmdbItem.genre_ids);
-                var finalGenreTitle = [yearStr, genreStr].filter(Boolean).join(" • ");
+                var finalGenreTitle = genreStr || (isTv ? "剧集" : "电影");
 
                 return {
                     id: String(tmdbItem.id),
@@ -238,15 +233,17 @@ async function loadDoubanModule(params) {
                     mediaType: tmdbItem.media_type,
                     title: tmdbItem.title || tmdbItem.name || title,
                     
-                    // ✨ 核心修改点
-                    genreTitle: finalGenreTitle, // 显示: 2024 • 剧情 / 科幻
-                    subTitle: "⭐ " + rate,      // 显示: ⭐ 8.5
+                    // ✨ 拼接完整日期
+                    genreTitle: finalGenreTitle, 
+                    subTitle: dateStr ? `⭐ ${rate} | ${dateStr}` : `⭐ ${rate}`,
+                    description: dateStr ? `${dateStr} · ⭐ ${rate}\n${item.info || tmdbItem.overview || "暂无简介"}` : (item.info || tmdbItem.overview),
                     
-                    description: item.info || tmdbItem.overview,
-                    posterPath: cleanPath(tmdbItem.poster_path),
-                    backdropPath: cleanPath(tmdbItem.backdrop_path),
-                    rating: tmdbItem.vote_average,
-                    releaseDate: tmdbItem.release_date || tmdbItem.first_air_date
+                    // 🚨 关键修复：原来错用了 cleanPath，这里改用 getTmdbImage 补全域名
+                    posterPath: getTmdbImage(tmdbItem.poster_path),
+                    backdropPath: getTmdbImage(tmdbItem.backdrop_path),
+                    rating: parseFloat(rate) || tmdbItem.vote_average,
+                    releaseDate: dateStr,
+                    year: yearStr
                 };
             } else {
                 // 兜底逻辑：使用原图
@@ -256,6 +253,11 @@ async function loadDoubanModule(params) {
                 } else if (item.pic && item.pic.normal) {
                     cover = item.pic.normal;
                 }
+                
+                // 🚨 破解豆瓣图片防盗链，使用 wsrv 图片代理
+                if (cover && cover.includes("doubanio.com")) {
+                    cover = "https://wsrv.nl/?url=" + encodeURIComponent(cover);
+                }
 
                 return {
                     id: String(item.id),
@@ -263,13 +265,13 @@ async function loadDoubanModule(params) {
                     mediaType: isTv ? "tv" : "movie",
                     title: title,
                     
-                    // 兜底显示
-                    genreTitle: (year ? year : "") + " • " + sub,
-                    subTitle: "⭐ " + rate,
-                    description: "TMDB 未收录",
+                    genreTitle: sub || (isTv ? "剧集" : "电影"),
+                    subTitle: `⭐ ${rate} | 豆瓣未匹配到TMDB`,
+                    description: item.info || "豆瓣专属内容，TMDB 暂未收录",
                     
-                    posterPath: cover, // 直连原图
-                    rating: rate,
+                    posterPath: cover, // 已破解防盗链
+                    rating: parseFloat(rate) || 0,
+                    year: year || "",
                     link: item.url || `https://movie.douban.com/subject/${item.id}/`
                 };
             }
@@ -289,24 +291,22 @@ function buildTmdbItem(item, mediaType) {
     var vote = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
     var genreNames = getGenreString(item.genre_ids);
 
-    // TMDB 模块保持一致布局
-    var finalGenreTitle = [yearStr, genreNames].filter(Boolean).join(" • ");
-
     return {
         id: String(item.id),
         tmdbId: item.id,
         type: "tmdb",
         mediaType: mediaType,
         title: title,
-        description: item.overview || "",
         
-        // ✨ 核心修改点
-        genreTitle: finalGenreTitle, // 2024 • 动作 / 冒险
-        subTitle: "⭐ " + vote,      // ⭐ 7.8
+        // ✨ 拼接完整日期
+        genreTitle: genreNames || (mediaType === "tv" ? "剧集" : "电影"),
+        subTitle: dateStr ? `⭐ ${vote} | ${dateStr}` : `⭐ ${vote}`,
+        description: dateStr ? `${dateStr} · ⭐ ${vote}\n${item.overview || "暂无简介"}` : (item.overview || ""),
         
         posterPath: getTmdbImage(item.poster_path),
         backdropPath: getTmdbImage(item.backdrop_path),
         releaseDate: dateStr,
+        year: yearStr,
         rating: item.vote_average
     };
 }
