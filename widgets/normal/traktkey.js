@@ -3,12 +3,13 @@ WidgetMetadata = {
     title: "Trakt 追剧日历 免key版",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "内置 API Key 版：只需填写用户名即可使用。显示追剧日历、待看、收藏及历史记录。",
-    version: "1.0.8", // 版本号微升
+    version: "1.1.9", // 版本号微升
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
     globalParams: [
-        { name: "traktUser", title: "Trakt 用户名 (必填)", type: "input", value: "" }
+        { name: "traktUser", title: "Trakt 用户名", type: "input", value: "" }
+        // 🗑️ 已移除 Client ID 输入框，清爽至极
     ],
 
     modules: [
@@ -26,7 +27,7 @@ WidgetMetadata = {
                     enumOptions: [
                         { title: "📅 追剧日历", value: "updates" },
                         { title: "📜 待看列表", value: "watchlist" },
-                        { title: "📦 收藏列表", value: "collection" }, // UI 显示为收藏，实际获取 Favorites
+                        { title: "📦 收藏列表", value: "collection" }, 
                         { title: "🕒 观看历史", value: "history" }
                     ]
                 },
@@ -57,18 +58,10 @@ WidgetMetadata = {
 };
 
 // ==========================================
-// 0. 全局配置 & 工具函数
+// 0. 全局内置配置
 // ==========================================
 
-const TRAKT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
-
-function formatShortDate(dateStr) {
-    if (!dateStr) return "待定";
-    const date = new Date(dateStr);
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const d = date.getDate().toString().padStart(2, '0');
-    return `${m}-${d}`;
-}
+const INTERNAL_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482"; 
 
 // ==========================================
 // 1. 主逻辑
@@ -77,11 +70,13 @@ function formatShortDate(dateStr) {
 async function loadTraktProfile(params = {}) {
     const { traktUser, section, updateSort = "future_first", type = "all", page = 1 } = params;
 
-    if (!traktUser) return [{ id: "err", type: "text", title: "请填写 Trakt 用户名" }];
+    if (!traktUser) {
+        return [{ id: "err", type: "text", title: "请在设置中填写 Trakt 用户名" }];
+    }
 
     // === A. 追剧日历 (Updates) ===
     if (section === "updates") {
-        return await loadUpdatesLogic(traktUser, TRAKT_CLIENT_ID, updateSort, page);
+        return await loadUpdatesLogic(traktUser, INTERNAL_CLIENT_ID, updateSort, page);
     }
 
     // === B. 常规列表 ===
@@ -90,15 +85,14 @@ async function loadTraktProfile(params = {}) {
     
     if (type === "all") {
         const [movies, shows] = await Promise.all([
-            fetchTraktList(section, "movies", sortType, page, traktUser, TRAKT_CLIENT_ID),
-            fetchTraktList(section, "shows", sortType, page, traktUser, TRAKT_CLIENT_ID)
+            fetchTraktList(section, "movies", sortType, page, traktUser, INTERNAL_CLIENT_ID),
+            fetchTraktList(section, "shows", sortType, page, traktUser, INTERNAL_CLIENT_ID)
         ]);
         rawItems = [...movies, ...shows];
     } else {
-        rawItems = await fetchTraktList(section, type, sortType, page, traktUser, TRAKT_CLIENT_ID);
+        rawItems = await fetchTraktList(section, type, sortType, page, traktUser, INTERNAL_CLIENT_ID);
     }
     
-    // 统一按时间倒序排列
     rawItems.sort((a, b) => new Date(getItemTime(b, section)) - new Date(getItemTime(a, section)));
     
     if (!rawItems || rawItems.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "列表为空" }] : [];
@@ -116,14 +110,18 @@ async function loadTraktProfile(params = {}) {
 }
 
 // ==========================================
-// 2. 追剧日历逻辑 (保持不变)
+// 2. 追剧日历逻辑
 // ==========================================
 
-async function loadUpdatesLogic(user, id, sort, page) {
+async function loadUpdatesLogic(user, clientId, sort, page) {
     const url = `https://api.trakt.tv/users/${user}/watched/shows?extended=noseasons&limit=100`;
     try {
         const res = await Widget.http.get(url, {
-            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": id }
+            headers: { 
+                "Content-Type": "application/json", 
+                "trakt-api-version": "2", 
+                "trakt-api-key": clientId
+            }
         });
         const data = res.data || [];
         if (data.length === 0) return [{ id: "empty", type: "text", title: "无观看记录" }];
@@ -166,30 +164,35 @@ async function loadUpdatesLogic(user, id, sort, page) {
         return valid.slice(start, start + 15).map(item => {
             const d = item.tmdb;
             let displayStr = "暂无排期";
-            let icon = "📅";
-            let epData = null;
-
-            if (d.next_episode_to_air) {
-                icon = "🔜";
-                epData = d.next_episode_to_air;
-            } else if (d.last_episode_to_air) {
-                icon = "📅";
-                epData = d.last_episode_to_air;
-            }
+            let yearStr = "";
+            let epData = d.next_episode_to_air || d.last_episode_to_air;
+            
+            let genreStr = d.genres && d.genres.length > 0 ? d.genres[0].name : "剧集";
 
             if (epData) {
-                const shortDate = formatShortDate(epData.air_date);
-                displayStr = `${icon} ${shortDate} 📺 S${epData.season_number}E${epData.episode_number}`;
+                const airDate = epData.air_date; 
+                yearStr = airDate.substring(0, 4); 
+                
+                const month = parseInt(airDate.substring(5, 7), 10);
+                const day = parseInt(airDate.substring(8, 10), 10);
+                
+                const s = epData.season_number;
+                const e = epData.episode_number;
+                
+                // 保留你最满意的拼接格式
+                displayStr = `${yearStr}/S${s}•E${e}/${month}.${day}`;
             }
 
             return {
                 id: String(d.id), 
                 tmdbId: d.id, 
                 type: "tmdb", 
-                mediaType: "tv",
+                mediaType: "tv", 
                 title: d.name, 
-                genreTitle: displayStr, 
-                subTitle: displayStr,
+                genreTitle: genreStr, // 适配横版：日期•类型
+                subTitle: "", 
+                releaseDate: displayStr, // 适配竖版：日期
+                year: yearStr, 
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
                 description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
             };
@@ -198,24 +201,26 @@ async function loadUpdatesLogic(user, id, sort, page) {
 }
 
 // ==========================================
-// 3. 核心修复区：API 映射与时间获取
+// 3. 通用列表获取逻辑
 // ==========================================
 
-async function fetchTraktList(section, type, sort, page, user, id) {
+async function fetchTraktList(section, type, sort, page, user, clientId) {
     const limit = 20; 
     let url = "";
 
-    // 修复重点：如果选的是 "collection" (收藏)，则请求 Favorites List 接口
     if (section === "collection") {
         url = `https://api.trakt.tv/users/${user}/favorites/${type}?extended=full&page=${page}&limit=${limit}`;
     } else {
-        // watchlist, history 保持原样
         url = `https://api.trakt.tv/users/${user}/${section}/${type}?extended=full&page=${page}&limit=${limit}`;
     }
 
     try {
         const res = await Widget.http.get(url, {
-            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": id }
+            headers: { 
+                "Content-Type": "application/json", 
+                "trakt-api-version": "2", 
+                "trakt-api-key": clientId
+            }
         });
         return Array.isArray(res.data) ? res.data : [];
     } catch (e) { return []; }
@@ -224,21 +229,26 @@ async function fetchTraktList(section, type, sort, page, user, id) {
 function getItemTime(item, section) {
     if (section === "watchlist") return item.listed_at;
     if (section === "history") return item.watched_at;
-    
-    // 修复重点：收藏列表 (Favorites) 的时间字段是 listed_at
-    if (section === "collection") return item.listed_at;
-    
+    if (section === "collection") return item.listed_at; 
     return item.created_at || "1970-01-01";
 }
 
 async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
     try {
         const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
-        const year = (d.first_air_date || d.release_date || "").substring(0, 4);
+        
+        const fullDate = d.first_air_date || d.release_date || "";
+        const year = fullDate.substring(0, 4); 
+        const genre = d.genres && d.genres.length > 0 ? d.genres[0].name : "影视";
+
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            genreTitle: year, subTitle: subInfo, description: d.overview,
+            genreTitle: genre, 
+            subTitle: "",
+            releaseDate: fullDate,       
+            year: year, 
+            description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
             posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
         };
     } catch (e) { return null; }
