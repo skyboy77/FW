@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全能电影榜",
     description: "提供流行、高分、年度最佳以及按类型探索电影",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.0.0",
+    version: "1.0.1", // 版本号小幅升级
     requiredVersion: "0.0.1",
     modules: [
         {
@@ -33,7 +33,7 @@ WidgetMetadata = {
                     title: "选择年份",
                     type: "enumeration",
                     value: "2024",
-                    belongTo: { paramName: "category", value: ["best_of_years"] }, // 核心魔法在这里
+                    belongTo: { paramName: "category", value: ["best_of_years"] },
                     enumOptions: [
                         { title: "2025", value: "2025" },
                         { title: "2024", value: "2024" },
@@ -54,7 +54,7 @@ WidgetMetadata = {
                     title: "选择类型",
                     type: "enumeration",
                     value: "878", // 默认科幻
-                    belongTo: { paramName: "category", value: ["by_genre"] }, // 核心魔法在这里
+                    belongTo: { paramName: "category", value: ["by_genre"] },
                     enumOptions: [
                         { title: "🛸 科幻 (Sci-Fi)", value: "878" },
                         { title: "🎭 剧情 (Drama)", value: "18" },
@@ -88,15 +88,24 @@ const GENRE_MAP = {
 // 提取类型的中文名称
 function getGenreText(ids) {
     if (!ids || !Array.isArray(ids)) return "";
+    // 最多取前 3 个类型，用 " / " 分隔，保持 UI 干净
     return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
 }
 
-// 统一的数据格式化函数
+// 统一的数据格式化函数 (核心修复区)
 function buildItem(item) {
     if (!item) return null;
-    const year = (item.release_date || "").substring(0, 4);
+    
+    // 提取完整日期 (YYYY-MM-DD) 和 年份 (YYYY)
+    const releaseDate = item.release_date || "";
+    const year = releaseDate.substring(0, 4);
+    
     const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
     const genreText = getGenreText(item.genre_ids);
+
+    // 组合副标题：兼顾图1(日期)与图3(类型)的需求，例如 "2026-01-16 · 科幻 / 动作"
+    // 如果没有日期，就只显示类型
+    const subTitleText = releaseDate ? `${releaseDate} · ${genreText}` : genreText;
 
     return {
         id: String(item.id),
@@ -104,13 +113,20 @@ function buildItem(item) {
         type: "tmdb",
         mediaType: "movie",
         title: item.title,
-        subTitle: `⭐ ${score} | ${year}`,
+        
+        // 【关键修复 1】统一规范化副标题，使横竖版都能清晰看到播出时间与类型
+        subTitle: subTitleText,
+        
+        // 【关键修复 2】竖版海报字段 (w500分辨率兼顾清晰与加载速度)
         coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
-        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
+        
+        // 【关键修复 3】将 backdropPath 更正为 Forward 标准字段 backdropUrl
+        // 这样当 UI 切换为横版时，引擎会自动抓取这张横向剧照，不再拉伸
+        backdropUrl: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
+        
         description: item.overview,
         rating: parseFloat(score),
-        year: year,
-        genreTitle: [year, genreText].filter(Boolean).join(" • ")
+        year: year
     };
 }
 
@@ -140,21 +156,18 @@ async function loadMovieList(params) {
             queryParams.sort_by = "vote_average.desc";
             queryParams["vote_count.gte"] = 1000;
         } else if (category === "best_of_years") {
-            // 获取二级菜单选中的年份
             const targetYear = params.year || "2024";
             endpoint = "/discover/movie";
             queryParams.primary_release_year = targetYear;
             queryParams.sort_by = "vote_average.desc";
-            queryParams["vote_count.gte"] = 500; // 防止冷门刷分
+            queryParams["vote_count.gte"] = 500; 
         } else if (category === "by_genre") {
-            // 获取二级菜单选中的类型
             const targetGenre = params.genre || "878";
             endpoint = "/discover/movie";
             queryParams.with_genres = targetGenre;
-            queryParams.sort_by = "popularity.desc"; // 按该类型下的热度排序
+            queryParams.sort_by = "popularity.desc"; 
         }
 
-        // 使用 FW 内置的 Widget.tmdb.get 发起请求 (无需配置 API Key)
         const res = await Widget.tmdb.get(endpoint, { params: queryParams });
         
         const items = (res.results || []).map(i => buildItem(i)).filter(Boolean);
@@ -162,7 +175,6 @@ async function loadMovieList(params) {
 
     } catch (error) {
         console.error("数据请求异常:", error);
-        // 如果出错，优雅地返回一条提示信息
         return [{
             id: "error",
             type: "text",
