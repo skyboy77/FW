@@ -1,11 +1,11 @@
 WidgetMetadata = {
-  id: "platform.originals.ui.fix",
-  title: "流媒体·独家原创",
-  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-  description: "发现Netflix/HBO/腾讯/B站等平台自制内容",
-  version: "1.0.4",
-  requiredVersion: "0.0.1",
-  site: "https://www.themoviedb.org",
+    id: "platform.originals.ui.fix",
+    title: "流媒体·独家原创",
+    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+    description: "发现Netflix/HBO/腾讯/B站等平台自制内容",
+    version: "1.0.5", // 升级了版本号
+    requiredVersion: "0.0.1",
+    site: "https://www.themoviedb.org",
 
     globalParams: [],
 
@@ -13,7 +13,7 @@ WidgetMetadata = {
         {
             title: "独家原创",
             functionName: "loadPlatformOriginals",
-            type: "list",
+            type: "video", // 升级为 video 模式，海报展示更美观
             cacheDuration: 3600,
             params: [
                 {
@@ -114,23 +114,29 @@ async function loadPlatformOriginals(params = {}) {
                 .slice(0, 3)
                 .join(" / ");
             
-            const date = item.first_air_date || "";
-            const year = date.substring(0, 4);
+            const fullDate = item.first_air_date || ""; // 获取完整日期
+            const year = fullDate.substring(0, 4);
             const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
 
             return {
                 id: String(item.id),
                 tmdbId: parseInt(item.id),
                 type: "tmdb",
-                mediaType: "tv",
+                mediaType: "tv", // 流媒体自制多数是剧集
                 title: item.name || item.original_name,
-                genreTitle: [year, genreNames].filter(Boolean).join(" • "),
-                subTitle: `TMDB ${score}`,
-                description: item.overview || "暂无简介",
+                
+                // 优化排版展示
+                genreTitle: genreNames || "剧集", 
+                subTitle: fullDate ? `⭐ ${score} | ${fullDate}` : `⭐ ${score}`,
+                description: fullDate ? `${fullDate} · ⭐ ${score}\n${item.overview || "暂无简介"}` : (item.overview || "暂无简介"),
+                
                 posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
                 backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
-                rating: score,
-                year: year
+                
+                // 传给内核的数据
+                rating: parseFloat(score) || 0,
+                year: year,
+                releaseDate: fullDate 
             };
         });
 
