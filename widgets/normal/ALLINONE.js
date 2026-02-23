@@ -9,13 +9,13 @@ WidgetMetadata = {
     title: "全球影视平台ALL IN ONE",
     description: "全网最全的频道聚合：覆盖爱优腾、网飞、HBO、韩国tvN及各大卫视",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.2.1", // 🚀 升级：引入防截断与双海报极简排版规范
+    version: "1.2.2", // 🚀 升级：引入防截断与双海报极简排版规范
     requiredVersion: "0.0.1",
     modules: [
         {
             title: "全网热播发现",
             functionName: "loadPlatformList",
-            type: "video", // 🔑 核心魔法 1：必须是 video 才能触发完美的横竖版自适应
+            type: "video", // 🔑 魔法 1：外层模块为 video
             cacheDuration: 3600,
             params: [
                 {
@@ -47,8 +47,7 @@ WidgetMetadata = {
                         { title: "🇰🇷 SBS", value: "sbs" },
                         { title: "🇰🇷 KBS2", value: "kbs2" },
                         { title: "🇺🇸 ABC", value: "abc" },
-                        { title: "🌍 国家地理频道", value: "natgeo" },
-                        { title: "📱 U mobile TV", value: "umobile" }
+                        { title: "🌍 国家地理频道", value: "natgeo" }
                     ]
                 },
                 {
@@ -106,7 +105,6 @@ const PLATFORM_MAP = {
     kbs2:    { network: "342", provider: null, region: "KR", name: "KBS2" },
     abc:     { network: "2", provider: null, region: "US", name: "ABC" },
     natgeo:  { network: "43", provider: null, region: "US", name: "国家地理" },
-    umobile: { network: "6974", provider: null, region: "US", name: "U mobile" },
     all:     { network: null, provider: null, region: null, name: "综合" }
 };
 
@@ -118,18 +116,20 @@ const GENRE_MAP = {
 };
 
 function getGenreText(ids) {
-    if (!ids || !Array.isArray(ids)) return "";
-    return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
+    if (!ids || !Array.isArray(ids)) return "影视";
+    const genres = ids.map(id => GENRE_MAP[id]).filter(Boolean);
+    return genres.length > 0 ? genres.slice(0, 2).join(" / ") : "影视";
 }
 
+// 🎯 核心修正：完全向你的二次元代码对齐
 function buildItem(item, isMovie, platformName) {
     if (!item) return null;
     
     const mediaType = isMovie ? "movie" : "tv";
     const title = item.title || item.name;
     const releaseDate = item.release_date || item.first_air_date || "";
-    const score = item.vote_average ? item.vote_average.toFixed(1) : "暂无";
-    const genreText = getGenreText(item.genre_ids) || "影视";
+    const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
+    const genreText = getGenreText(item.genre_ids);
     
     let typeTag = isMovie ? "🎬" : "📺";
     if (item.genre_ids?.includes(16)) typeTag = "🐰";
@@ -138,22 +138,23 @@ function buildItem(item, isMovie, platformName) {
     return {
         id: String(item.id),
         tmdbId: parseInt(item.id),
-        type: "video", // 或者 tmdb，取决于底层跳转要求，通常外层定义了即可
+        type: "tmdb", // 🔑 魔法 2：内层项目为 tmdb 类型，完全适配框架逻辑
         mediaType: mediaType,
         title: title,
         
-        // 🔑 核心魔法 2：交给框架去提取年份，我们只管传全量日期和干净的类型
+        genreTitle: genreText, 
+        
+        // 🔑 魔法 3：竖版下这行显示在副标题位置
+        description: `${typeTag} ${platformName} | ⭐ ${score}`, 
+        
+        // 传给内核的日期，横版排版会自动提年份
         releaseDate: releaseDate, 
-        genreTitle: genreText,    
-        subTitle: "",             
         
-        // 提供双海报弹药库，让 type="video" 自己去挑
-        coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "", 
-        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "", 
+        // 🔑 魔法 4：彻底抛弃 coverUrl，严格使用 posterPath 和 backdropPath
+        posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
+        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
         
-        // 🔑 核心魔法 3：利用 description 渲染竖版模式下方的小字
-        description: `${typeTag} ${platformName} | ⭐ ${score}`,
-        rating: item.vote_average || 0
+        rating: score
     };
 }
 
@@ -178,7 +179,7 @@ async function loadPlatformList(params) {
     if (platform !== "all") {
         if (isMovie) {
             if (!platformConfig.provider) {
-                return [{ id: "empty", type: "text", title: "无电影分类", description: `电视台 [${platformConfig.name}] 通常不单独作为电影流媒体发行商，请切换为[剧集]或[综艺]重试。` }];
+                return [{ id: "empty", type: "text", title: "无电影分类", description: `[${platformConfig.name}] 暂不支持该分类。` }];
             }
             queryParams.with_watch_providers = platformConfig.provider;
             queryParams.watch_region = platformConfig.region || "US";
@@ -223,7 +224,6 @@ async function loadPlatformList(params) {
         return items;
 
     } catch (error) {
-        console.error("加载榜单失败:", error);
-        return [{ id: "error", type: "text", title: "网络异常", description: "请求 TMDB 失败，请下拉重试" }];
+        return [{ id: "error", type: "text", title: "网络异常", description: "请求失败，请重试" }];
     }
 }
