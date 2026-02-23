@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.0.9", // 升级版本号
+    version: "1.1.0", // 修复追剧日历横版头部乱码
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -62,7 +62,7 @@ WidgetMetadata = {
 // 0. 全局配置与工具函数
 // ==========================================
 
-// 👇 请在这里填入你之前申请好的 Trakt Client ID
+// 👇 内置好的 Trakt Client ID
 const DEFAULT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482"; 
 
 function formatShortDate(dateStr) {
@@ -182,7 +182,7 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
 
             if (epData) {
                 const shortDate = formatShortDate(epData.air_date);
-                // 格式化为：02-24•S01-E03
+                // 格式化为：02-24•S01-E08
                 const s = String(epData.season_number).padStart(2, '0');
                 const e = String(epData.episode_number).padStart(2, '0');
                 displayStr = `${shortDate}•S${s}-E${e}`;
@@ -196,7 +196,8 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 title: d.name, 
                 genreTitle: displayStr, // 横版副标题
                 subTitle: displayStr,
-                releaseDate: displayStr, // 核心：让竖版也显示 02-24•S01-E03
+                releaseDate: displayStr, // 竖版显示 02-24•S01-E08
+                year: "", // 🚀 核心修复：强制年份为空，阻止系统从 releaseDate 乱取数据自动拼接！
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
                 description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
             };
@@ -257,7 +258,8 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
             genreTitle: horizontalText,  // 横版显示: 2026•恐怖
             subTitle: horizontalText,
             releaseDate: fullDate,       // 竖版显示完整日期: 2025-07-18
-            description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, // 把时间记录放到简介中
+            year: "",                    // 同步做一下安全防护，避免有些设备上出双份年份
+            description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
             posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
         };
     } catch (e) { return null; }
