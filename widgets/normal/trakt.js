@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.1.7", // 🚀 强迫症福音版：缩短季集格式(S1-E7)，完美利用系统横版的拼接点填入"类型"
+    version: "1.1.8", // 🚀 避坑版：替换短横线，绕过系统年份截断机制，采用全新符号分隔排版
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -169,7 +169,6 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
             let yearStr = "";
             let epData = d.next_episode_to_air || d.last_episode_to_air;
             
-            // 👇 提取剧集类型，默认给个"剧集"兜底
             let genreStr = d.genres && d.genres.length > 0 ? d.genres[0].name : "剧集";
 
             if (epData) {
@@ -179,11 +178,11 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 const month = parseInt(airDate.substring(5, 7), 10);
                 const day = parseInt(airDate.substring(8, 10), 10);
                 
-                // 👇 去掉 padStart(2, '0')，让 S01E07 变成 S1-E7
                 const s = epData.season_number;
                 const e = epData.episode_number;
                 
-                displayStr = `${yearStr}•S${s}-E${e}•${month}/${day}`;
+                // 👇 全新格式拼接，绕开系统截断，变成：2026/S1•E2/2.23
+                displayStr = `${yearStr}/S${s}•E${e}/${month}.${day}`;
             }
 
             return {
@@ -193,9 +192,7 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 mediaType: "tv", 
                 title: d.name, 
                 genreTitle: "", 
-                // 👇 subTitle 放类型，横版系统拼接时刚好拼成：日期•类型
                 subTitle: genreStr, 
-                // 👇 releaseDate 放核心日期，竖版系统只读这个
                 releaseDate: displayStr, 
                 year: yearStr, 
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
@@ -250,7 +247,6 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
             genreTitle: "", 
-            // 同理，常规列表也这样防拖尾点
             subTitle: genre,
             releaseDate: fullDate,       
             year: year, 
