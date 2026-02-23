@@ -5,7 +5,7 @@
  */
 
 WidgetMetadata = {
-    id: "allinone_global_networks",
+    id: "makka_global_networks",
     title: "🌐 全球影视平台",
     description: "全网最全的频道聚合：覆盖爱优腾、网飞、HBO、韩国tvN及各大卫视",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
