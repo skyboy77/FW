@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.1.6", // 🚀 终极修复：回归 releaseDate 字段，解决竖版不显示及横版重影问题
+    version: "1.1.7", // 🚀 强迫症福音版：缩短季集格式(S1-E7)，完美利用系统横版的拼接点填入"类型"
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -168,6 +168,9 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
             let displayStr = "暂无排期";
             let yearStr = "";
             let epData = d.next_episode_to_air || d.last_episode_to_air;
+            
+            // 👇 提取剧集类型，默认给个"剧集"兜底
+            let genreStr = d.genres && d.genres.length > 0 ? d.genres[0].name : "剧集";
 
             if (epData) {
                 const airDate = epData.air_date; 
@@ -176,10 +179,11 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 const month = parseInt(airDate.substring(5, 7), 10);
                 const day = parseInt(airDate.substring(8, 10), 10);
                 
-                const s = String(epData.season_number).padStart(2, '0');
-                const e = String(epData.episode_number).padStart(2, '0');
+                // 👇 去掉 padStart(2, '0')，让 S01E07 变成 S1-E7
+                const s = epData.season_number;
+                const e = epData.episode_number;
                 
-                displayStr = `${yearStr}•S${s}E${e}•${month}/${day}`;
+                displayStr = `${yearStr}•S${s}-E${e}•${month}/${day}`;
             }
 
             return {
@@ -188,9 +192,10 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 type: "tmdb", 
                 mediaType: "tv", 
                 title: d.name, 
-                // 👇 核心修复区：把宝全押在权重最高的 releaseDate 上，其他置空防止拼接
                 genreTitle: "", 
-                subTitle: "", 
+                // 👇 subTitle 放类型，横版系统拼接时刚好拼成：日期•类型
+                subTitle: genreStr, 
+                // 👇 releaseDate 放核心日期，竖版系统只读这个
                 releaseDate: displayStr, 
                 year: yearStr, 
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
@@ -240,15 +245,14 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
         const fullDate = d.first_air_date || d.release_date || "";
         const year = fullDate.substring(0, 4); 
         const genre = d.genres && d.genres.length > 0 ? d.genres[0].name : "影视";
-        const horizontalText = year ? `${year}•${genre}` : genre;
 
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            // 👇 这里也一样，把信息全合并到 releaseDate，防止其他列表横版双拼
             genreTitle: "", 
-            subTitle: "",
-            releaseDate: fullDate ? `${horizontalText} • ${fullDate}` : horizontalText,       
+            // 同理，常规列表也这样防拖尾点
+            subTitle: genre,
+            releaseDate: fullDate,       
             year: year, 
             description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
             posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
