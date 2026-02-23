@@ -3,13 +3,13 @@ WidgetMetadata = {
   title: "流媒体·独家原创（更新时间版）",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
   description: "各平台独播剧",
-  version: "1.0.5",
+  version: "1.0.6", // 升级版本号
   requiredVersion: "0.0.1",
   modules: [
     {
       title: "独家原创 & 追更日历",
       functionName: "loadPlatformOriginals",
-      type: "list",
+      type: "video", // 🎬 升级为竖版海报模式
       requiresWebView: false,
       params: [
         // 1. 平台选择
@@ -136,7 +136,6 @@ async function loadPlatformOriginals(params) {
         queryParams["air_date.lte"] = today;
         queryParams.sort_by = "popularity.desc";
     } else if (sortBy === "next_episode") {
-        // 追更模式：先按热度取前20个，确保热门剧不漏，然后在本地重排
         queryParams.sort_by = "popularity.desc";
     } else {
         if (sortBy.includes("vote_average")) queryParams["vote_count.gte"] = 100;
@@ -153,92 +152,77 @@ async function loadPlatformOriginals(params) {
     }
 
     // === 2. 详情获取与格式化 ===
-    
-    // 判断是否需要查详细集数
     const needDetails = (contentType !== "movie" && (sortBy === "next_episode" || sortBy === "daily_airing"));
-    // 增加处理数量，保证排序基数足够
     const processCount = needDetails ? 20 : 20;
 
     const processedItems = await Promise.all(items.slice(0, processCount).map(async (item) => {
-        let displayStr = ""; 
-        let sortDate = "1900-01-01";
-        
-        // 默认基础信息
-        sortDate = item.first_air_date || item.release_date || "2099-01-01";
-        const year = sortDate.substring(0, 4);
+        let fullDate = item.first_air_date || item.release_date || "1900-01-01";
+        let sortDate = fullDate;
+        const year = fullDate.substring(0, 4) !== "1900" ? fullDate.substring(0, 4) : "";
         const genre = getGenreName(item.genre_ids);
         
+        // 存储我们将要构建的追更专属字段
+        let isUpdateMode = false;
+        let updateStr = ""; 
+        let epStr = "";
+
         if (needDetails) {
-            // 调用 TMDB 详情接口
             try {
                 const detail = await Widget.tmdb.get(`/tv/${item.id}`, { params: { language: "zh-CN" } });
                 if (detail) {
                     const nextEp = detail.next_episode_to_air;
                     const lastEp = detail.last_episode_to_air;
-
-                    // 核心显示逻辑
-                    let targetEp = null;
+                    let targetEp = nextEp || lastEp;
                     
-                    if (nextEp) {
-                        targetEp = nextEp;
-                    } else if (lastEp) {
-                        targetEp = lastEp;
-                    }
-
                     if (targetEp) {
-                        sortDate = targetEp.air_date;
-                        const dateStr = formatShortDate(sortDate);
-                        const epStr = `S${String(targetEp.season_number).padStart(2,'0')}E${String(targetEp.episode_number).padStart(2,'0')}`;
-                        // 格式：01-31 S01E04 科幻
-                        displayStr = `${dateStr} ${epStr} ${genre}`;
-                    } else {
-                        // 只有首播信息
-                        displayStr = `${formatShortDate(item.first_air_date)} 首播 ${genre}`;
+                        isUpdateMode = true;
+                        sortDate = targetEp.air_date; // 使用具体集的日期去排序
+                        fullDate = sortDate; // 覆盖原始首播日期为最新集日期
+                        const shortDate = formatShortDate(sortDate);
+                        epStr = `S${String(targetEp.season_number).padStart(2,'0')}E${String(targetEp.episode_number).padStart(2,'0')}`;
+                        
+                        // ✨ 核心拼接逻辑： 02-26 S01E130 动画
+                        updateStr = `${shortDate} ${epStr} ${genre}`;
                     }
                 }
             } catch(e) {
-                displayStr = `${year} ${genre}`;
+                // 忽略详情请求错误，走降级
             }
-        } else {
-            // 普通模式/电影
-            const rating = item.vote_average ? `${item.vote_average.toFixed(1)}分` : "";
-            displayStr = `${year} ${genre} ${rating}`;
         }
 
         return {
             ...item,
-            _displayStr: displayStr,
-            _sortDate: sortDate
+            _fullDate: fullDate !== "1900-01-01" ? fullDate : "",
+            _year: year,
+            _genre: genre,
+            _sortDate: sortDate,
+            _isUpdateMode: isUpdateMode,
+            _updateStr: updateStr,
+            _epStr: epStr
         };
     }));
 
-    // === 3. 严谨的本地排序 (关键修复) ===
+    // === 3. 严谨的本地排序 ===
     let finalItems = processedItems;
     
     if (sortBy === "next_episode" && contentType !== "movie") {
-        const today = new Date().toISOString().split("T")[0]; // 获取今天日期 "2024-05-20"
+        const today = new Date().toISOString().split("T")[0];
 
         finalItems.sort((a, b) => {
             const dateA = a._sortDate;
             const dateB = b._sortDate;
 
-            // 判断是否是未来/今天
             const isAFuture = dateA >= today;
             const isBFuture = dateB >= today;
 
-            // 1. 未来/今天的 排在 过去/完结的 前面
             if (isAFuture && !isBFuture) return -1; 
             if (!isAFuture && isBFuture) return 1;
 
-            // 2. 如果都是未来/今天：按时间正序 (最近的在前: 明天 -> 后天)
             if (isAFuture && isBFuture) {
                 if (dateA === dateB) return 0;
                 return dateA > dateB ? 1 : -1;
             }
 
-            // 3. 如果都是过去：按时间倒序 (刚播完的在前: 昨天 -> 上周)
-            // 或者是按照综艺榜的逻辑，也是正序？
-            // 既然是“追更”，通常想看最新的。这里为了整洁，我们把刚播完的放在未来列表的紧下方。
             if (dateA === dateB) return 0;
             return dateB > dateA ? 1 : -1; 
         });
@@ -253,14 +237,25 @@ async function loadPlatformOriginals(params) {
 
 function buildCard(item, contentType) {
     const isMovie = contentType === "movie";
+    const scoreNum = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
+    const scoreStr = `⭐ ${scoreNum}`;
     
-    // 图片
-    let imagePath = "";
-    if (item.backdrop_path) imagePath = `https://image.tmdb.org/t/p/w780${item.backdrop_path}`;
-    else if (item.poster_path) imagePath = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
+    let subTitle = "";
+    let genreTitle = "";
+    let description = "";
 
-    // 使用拼接好的字符串
-    const displayStr = item._displayStr || "";
+    // ✨ 根据是否是"追更/今日播出"模式，走不同的竖版排版
+    if (item._isUpdateMode) {
+        // 追更模式排版
+        genreTitle = item._epStr || item._genre; // 右上角显示集数 (如 S01E04) 或 类型
+        subTitle = item._updateStr;             // 左下角：02-26 S01E130 动画
+        description = `${item._updateStr} · ${scoreStr}\n${item.overview || "暂无简介"}`;
+    } else {
+        // 常规排版
+        genreTitle = item._genre || (isMovie ? "电影" : "剧集");
+        subTitle = item._fullDate ? `${scoreStr} | ${item._fullDate}` : scoreStr;
+        description = item._fullDate ? `${item._fullDate} · ${scoreStr}\n${item.overview || "暂无简介"}` : (item.overview || "暂无简介");
+    }
 
     return {
         id: String(item.id),
@@ -269,12 +264,17 @@ function buildCard(item, contentType) {
         mediaType: isMovie ? "movie" : "tv",
         title: item.name || item.title || item.original_name,
         
-        // 左下角：01-31 S01E04 科幻
-        subTitle: displayStr, 
-        // 右上角：01-31 S01E04 科幻
-        genreTitle: displayStr, 
+        genreTitle: genreTitle,
+        subTitle: subTitle,
+        description: description,
         
-        description: item.overview || "暂无简介",
-        posterPath: imagePath
+        // 🚨 修复竖版海报路径逻辑：强制区分 poster 和 backdrop
+        posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
+        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
+        
+        // 传给内核的底层数据
+        rating: parseFloat(scoreNum) || 0,
+        year: item._year || "",
+        releaseDate: item._fullDate || ""
     };
 }
