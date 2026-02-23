@@ -3,13 +3,13 @@ WidgetMetadata = {
     title: "即将上映与热映榜",
     description: "追踪院线即将上映的电影与最新剧集，热度显示，不错过任何一部大片",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.0.0",
+    version: "1.0.1", // 增加了横竖版年份日期与类型适配
     requiredVersion: "0.0.1",
     modules: [
         {
             title: "🎬 新片追踪",
             functionName: "loadUpcoming",
-            type: "list",
+            type: "list", // 可随时切换为 video 测试竖版
             cacheDuration: 3600, // 缓存1小时
             params: [
                 {
@@ -30,6 +30,24 @@ WidgetMetadata = {
     ]
 };
 
+// ================= 辅助字典 =================
+
+// TMDB 类型字典映射
+const GENRE_MAP = {
+    10759: "动作冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
+    18: "剧情", 10751: "家庭", 10762: "儿童", 9648: "悬疑", 10763: "新闻",
+    10764: "真人秀", 10765: "科幻", 10766: "肥皂剧", 10767: "脱口秀",
+    10768: "政治", 37: "西部", 28: "动作", 12: "冒险", 14: "奇幻", 
+    878: "科幻", 27: "恐怖", 10749: "爱情", 53: "惊悚", 10752: "战争"
+};
+
+// 提取首个类型名称
+function getGenreText(ids) {
+    if (!ids || !Array.isArray(ids)) return "影视";
+    return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 1).join("") || "影视";
+}
+
+
 // ================= 逻辑处理部分 =================
 
 // 数据格式化函数，包含倒计时计算魔法
@@ -39,6 +57,10 @@ function buildItem(item, mediaType) {
     // 兼容电影和剧集的标题与日期字段
     const title = item.title || item.name;
     const releaseDate = item.release_date || item.first_air_date || "";
+    const yearStr = releaseDate ? releaseDate.substring(0, 4) : "";
+    
+    // 获取类型文本 (如: 科幻)
+    const genreText = getGenreText(item.genre_ids);
     
     // 计算上映倒计时
     let dateLabel = `📅 ${releaseDate}`;
@@ -62,7 +84,10 @@ function buildItem(item, mediaType) {
     }
 
     const score = item.vote_average ? item.vote_average.toFixed(1) : "暂无";
-    const popularity = item.popularity ? `热度: ${Math.round(item.popularity)}` : "";
+    const popularity = item.popularity ? Math.round(item.popularity) : 0;
+
+    // ✨ 构建副标题：科幻 热度:213 （横版 Forward 会自动在前面拼接 年份 • ）
+    const displaySubtitle = `${genreText} 热度:${popularity}`;
 
     return {
         id: String(item.id),
@@ -70,14 +95,22 @@ function buildItem(item, mediaType) {
         type: "tmdb", // FW 核心：调起原生页面获取预告片
         mediaType: mediaType,
         title: title,
-        // 将倒计时和评分组合显示在副标题
-        subTitle: `${dateLabel} | ⭐ ${score}`,
+        
+        // 渲染给横版列表的副标题
+        genreTitle: displaySubtitle, 
+        subTitle: displaySubtitle,
+        
         coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
+        posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "", // 兼容标准字段
         backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
-        description: item.overview || "这部影片目前还没有中文简介，敬请期待！",
+        
+        // 将原先的倒计时魔法和评分放进简介，不丢失信息！
+        description: `${dateLabel} | ⭐ 评分: ${score}\n${item.overview || "这部影片目前还没有中文简介，敬请期待！"}`,
         rating: item.vote_average || 0,
-        // 添加一个额外标签显示关注度
-        genreTitle: popularity 
+        
+        // ✨ 新增的核心字段，负责点亮横竖版的时间显示
+        year: yearStr,           // 负责横版榜单的最前面年份："2025"
+        releaseDate: releaseDate // 负责竖版海报下方的完整日期："2025-05-12"
     };
 }
 
