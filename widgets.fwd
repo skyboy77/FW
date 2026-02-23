@@ -134,7 +134,7 @@
       "title": "影视榜单Lite",
       "description": "豆瓣全能推荐 | TMDB探索 | 猜你想看",
       "requiredVersion": "0.0.1",
-      "version": "1.0.4",
+      "version": "1.1.0",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/ysbd.js"
     },
@@ -152,7 +152,7 @@
       "title": "IMDb热榜",
       "description": "IMDb全球榜单，支持日/周纬度切换。",
       "requiredVersion": "0.0.1",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/imdb.js"
     }
