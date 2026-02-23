@@ -3,13 +3,12 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.1.0", // 修复追剧日历横版头部乱码
+    version: "1.2.0", // 🚀 终极修复：利用系统自身查重逻辑，根治横版前缀乱码
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
     globalParams: [
         { name: "traktUser", title: "Trakt 用户名 (必填)", type: "input", value: "" },
-        // 将 Client ID 改为选填
         { name: "traktClientId", title: "Trakt Client ID (选填，不填使用内置)", type: "input", value: "" }
     ],
 
@@ -62,7 +61,6 @@ WidgetMetadata = {
 // 0. 全局配置与工具函数
 // ==========================================
 
-// 👇 内置好的 Trakt Client ID
 const DEFAULT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482"; 
 
 function formatShortDate(dateStr) {
@@ -80,7 +78,6 @@ function formatShortDate(dateStr) {
 async function loadTraktProfile(params = {}) {
     const { traktUser, traktClientId, section, updateSort = "future_first", type = "all", page = 1 } = params;
 
-    // 校验必填项用户名，ClientId 不填则使用内置默认值
     if (!traktUser) {
         return [{ id: "err", type: "text", title: "请填写 Trakt 用户名" }];
     }
@@ -106,7 +103,6 @@ async function loadTraktProfile(params = {}) {
         rawItems = await fetchTraktList(section, type, sortType, page, traktUser, finalClientId);
     }
     
-    // 统一按时间倒序排列
     rawItems.sort((a, b) => new Date(getItemTime(b, section)) - new Date(getItemTime(a, section)));
     
     if (!rawItems || rawItems.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "列表为空" }] : [];
@@ -178,14 +174,14 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
         return valid.slice(start, start + 15).map(item => {
             const d = item.tmdb;
             let displayStr = "暂无排期";
+            let shortDateStr = "";
             let epData = d.next_episode_to_air || d.last_episode_to_air;
 
             if (epData) {
-                const shortDate = formatShortDate(epData.air_date);
-                // 格式化为：02-24•S01-E08
+                shortDateStr = formatShortDate(epData.air_date); // 例如: 02-24
                 const s = String(epData.season_number).padStart(2, '0');
                 const e = String(epData.episode_number).padStart(2, '0');
-                displayStr = `${shortDate}•S${s}-E${e}`;
+                displayStr = `${shortDateStr}•S${s}-E${e}`; // 例如: 02-24•S01-E08
             }
 
             return {
@@ -194,10 +190,10 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 type: "tmdb", 
                 mediaType: "tv", 
                 title: d.name, 
-                genreTitle: displayStr, // 横版副标题
+                genreTitle: displayStr,
                 subTitle: displayStr,
-                releaseDate: displayStr, // 竖版显示 02-24•S01-E08
-                year: "", // 🚀 核心修复：强制年份为空，阻止系统从 releaseDate 乱取数据自动拼接！
+                releaseDate: displayStr, 
+                year: shortDateStr, // 🚀 骗过系统的关键！告诉它前缀就是 02-24，阻止它自动乱加
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
                 description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
             };
@@ -242,23 +238,18 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
     try {
         const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
         
-        // 提取年份和完整日期
         const fullDate = d.first_air_date || d.release_date || "";
-        const year = fullDate.substring(0, 4);
-        
-        // 提取类型（取第一个），没有则默认显示为"影视"
+        const year = fullDate.substring(0, 4); // 真实年份
         const genre = d.genres && d.genres.length > 0 ? d.genres[0].name : "影视";
-        
-        // 拼接横版显示的文本，例如：2026•恐怖
         const horizontalText = year ? `${year}•${genre}` : genre;
 
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            genreTitle: horizontalText,  // 横版显示: 2026•恐怖
+            genreTitle: horizontalText,  
             subTitle: horizontalText,
-            releaseDate: fullDate,       // 竖版显示完整日期: 2025-07-18
-            year: "",                    // 同步做一下安全防护，避免有些设备上出双份年份
+            releaseDate: fullDate,       
+            year: year, // 🚀 恢复原真实年份，这会触发防重逻辑，保证待看列表不出错
             description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
             posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
         };
