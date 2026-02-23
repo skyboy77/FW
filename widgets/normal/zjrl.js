@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全球追剧时刻表",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合全球剧集更新表&综艺排期&bangumi动漫周更表。",
-    version: "2.1.1", // 完美适配横竖版底层字段
+    version: "2.1.2", // 修复今日更新日期丢失 & 去除今天字样
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
     
@@ -136,7 +136,6 @@ function buildItem({ id, tmdbId, type, title, poster, backdrop, rating, subTitle
         mediaType: type,
         title: title,
         
-        // 副标题内容：只传 "今天 科幻"，横版时 Forward 会自动加上 "2026 • "
         genreTitle: subTitle, 
         subTitle: subTitle,
         
@@ -214,7 +213,6 @@ async function loadBangumiCalendar(params = {}) {
                 itemData.releaseDate = fullDate; // 为竖版海报提供日期
             }
             
-            // ✨ 拼接: 周一 动画（横版会自动拼成 2026 • 周一 动画）
             const displaySubtitle = `${dayName} ${itemData.genreText}`;
 
             return buildItem({
@@ -263,13 +261,16 @@ async function loadTvCalendar(params = {}) {
         if (!data.results || data.results.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "暂无更新" }] : [];
 
         return data.results.map(item => {
-            const fullDate = item[dateField] || ""; // e.g. 2026-02-23
+            // ✨ 核心修复：如果是今日更新，TMDB 不返回 air_date，我们强制赋予今天的日期
+            const fullDate = (mode === "update_today") ? dates.start : (item.first_air_date || "");
+            
             const yearStr = fullDate.substring(0, 4);
             const shortDate = fullDate.slice(5).replace("-", "/"); // e.g. 02/23
             const genreText = getGenreText(item.genre_ids) || "剧集";
             
-            // ✨ 拼接: 今天 科幻 或 02/23 科幻
-            let timeLabel = mode === "update_today" ? "今天" : shortDate;
+            // ✨ 逻辑调整：今日更新不需要前缀时间，直接留类型即可
+            let timeLabel = mode === "update_today" ? "" : shortDate;
+            // 去掉前缀后的空格，例如直接返回 "科幻" 而不是 " 科幻"
             const displaySubtitle = timeLabel ? `${timeLabel} ${genreText}` : genreText;
 
             return buildItem({
@@ -279,7 +280,7 @@ async function loadTvCalendar(params = {}) {
                 subTitle: displaySubtitle, 
                 desc: item.overview,
                 year: yearStr,           // 传给横版拼年份
-                releaseDate: fullDate    // 传给竖版显日期
+                releaseDate: fullDate    // 传给竖版显完整日期
             });
         });
     } catch (e) { return [{ id: "err", type: "text", title: "网络错误" }]; }
@@ -375,7 +376,6 @@ async function fetchTmdbVariety(region, dateStr) {
             const genreText = getGenreText(item.genre_ids) || "综艺";
             const shortDate = dateStr ? dateStr.substring(5).replace("-", "/") : "";
             
-            // ✨ 拼接: 02/23 综艺
             const displaySubtitle = shortDate ? `${shortDate} ${genreText}` : `近期热播 ${genreText}`;
 
             return buildItem({
@@ -404,7 +404,6 @@ async function fetchTmdbDetail(tmdbId, traktItem) {
         const e = String(ep.number).padStart(2,'0');
         const genreText = getGenreText(d.genres?.map(g=>g.id)) || "综艺";
         
-        // ✨ Trakt专属: S01-E05 综艺
         const displaySubtitle = `S${s}-E${e} ${genreText}`;
 
         return buildItem({
