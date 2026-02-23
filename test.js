@@ -1,9 +1,9 @@
 WidgetMetadata = {
-    id: "trakt_test_mixed",
-    title: "Trak_test 追剧日历&个人中心",
+    id: "trakt_perrest_mixed",
+    title: "Trak test剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.1.0", // 🚀 强迫症福音版：缩短季集格式(S1-E7)，完美利用系统横版的拼接点填入"类型"
+    version: "1.1.9", // 🚀 强迫症终极版：将类型精准填入 genreTitle，完美对接横版的类型拼接点
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
@@ -169,7 +169,6 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
             let yearStr = "";
             let epData = d.next_episode_to_air || d.last_episode_to_air;
             
-            // 👇 提取剧集类型，默认给个"剧集"兜底
             let genreStr = d.genres && d.genres.length > 0 ? d.genres[0].name : "剧集";
 
             if (epData) {
@@ -179,11 +178,10 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 const month = parseInt(airDate.substring(5, 7), 10);
                 const day = parseInt(airDate.substring(8, 10), 10);
                 
-                // 👇 去掉 padStart(2, '0')，让 S01E07 变成 S1-E7
                 const s = epData.season_number;
                 const e = epData.episode_number;
                 
-                displayStr = `${yearStr}•S${s}-E${e}•${month}/${day}`;
+                displayStr = `${yearStr}/S${s}•E${e}/${month}.${day}`;
             }
 
             return {
@@ -192,10 +190,10 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 type: "tmdb", 
                 mediaType: "tv", 
                 title: d.name, 
-                genreTitle: "", 
-                // 👇 subTitle 放类型，横版系统拼接时刚好拼成：日期•类型
-                subTitle: genreStr, 
-                // 👇 releaseDate 放核心日期，竖版系统只读这个
+                // 👇 把类型填入 genreTitle，完美对接横版的系统拼接！
+                genreTitle: genreStr, 
+                // 👇 subTitle 置空，防止系统又搞出什么幺蛾子拼接
+                subTitle: "", 
                 releaseDate: displayStr, 
                 year: yearStr, 
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
@@ -249,9 +247,9 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            genreTitle: "", 
-            // 同理，常规列表也这样防拖尾点
-            subTitle: genre,
+            // 👇 这里也同步修正，确保常规列表横版表现也一致
+            genreTitle: genre, 
+            subTitle: "",
             releaseDate: fullDate,       
             year: year, 
             description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
