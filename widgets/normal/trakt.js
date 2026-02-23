@@ -3,13 +3,12 @@ WidgetMetadata = {
     title: "Trak 追剧日历&个人中心",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "追剧日历:显示你观看剧集最新集的 更新时间&Trakt 待看/收藏/历史。",
-    version: "1.3.0", // 🚀 回调版：恢复 Client ID 选填框，满足进阶玩家需求，保留文本除虫补丁
+    version: "1.1.6", // 🚀 终极修复：回归 releaseDate 字段，解决竖版不显示及横版重影问题
     requiredVersion: "0.0.1",
     site: "https://trakt.tv",
 
     globalParams: [
         { name: "traktUser", title: "Trakt 用户名 (必填)", type: "input", value: "" },
-        // 👇 把 Client ID 输入框重新加回来啦，标记为选填
         { name: "traktClientId", title: "Trakt Client ID (选填，不填使用内置)", type: "input", value: "" }
     ],
 
@@ -69,14 +68,12 @@ const DEFAULT_CLIENT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e
 // ==========================================
 
 async function loadTraktProfile(params = {}) {
-    // 👇 获取传入的 traktClientId
     const { traktUser, traktClientId, section, updateSort = "future_first", type = "all", page = 1 } = params;
 
     if (!traktUser) {
         return [{ id: "err", type: "text", title: "请填写 Trakt 用户名" }];
     }
     
-    // 👇 核心逻辑：用户填了就用用户的，没填就用内置的
     const finalClientId = traktClientId || DEFAULT_CLIENT_ID;
 
     // === A. 追剧日历 (Updates) ===
@@ -191,10 +188,10 @@ async function loadUpdatesLogic(user, clientId, sort, page) {
                 type: "tmdb", 
                 mediaType: "tv", 
                 title: d.name, 
-                // 继续保持置空，防止重影
+                // 👇 核心修复区：把宝全押在权重最高的 releaseDate 上，其他置空防止拼接
                 genreTitle: "", 
-                subTitle: displayStr,
-                releaseDate: "", 
+                subTitle: "", 
+                releaseDate: displayStr, 
                 year: yearStr, 
                 posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : "",
                 description: `上次观看: ${item.watchedDate.split("T")[0]}\n${d.overview}`
@@ -248,9 +245,10 @@ async function fetchTmdbDetail(id, type, subInfo, originalTitle) {
         return {
             id: String(d.id), tmdbId: d.id, type: "tmdb", mediaType: type,
             title: d.name || d.title || originalTitle,
-            genreTitle: "", // 保持防重影
-            subTitle: horizontalText,
-            releaseDate: fullDate,       
+            // 👇 这里也一样，把信息全合并到 releaseDate，防止其他列表横版双拼
+            genreTitle: "", 
+            subTitle: "",
+            releaseDate: fullDate ? `${horizontalText} • ${fullDate}` : horizontalText,       
             year: year, 
             description: `记录时间: ${subInfo}\n${d.overview || "暂无简介"}`, 
             posterPath: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : ""
