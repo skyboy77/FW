@@ -3,13 +3,13 @@ WidgetMetadata = {
   title: "流媒体·独家原创（更新时间版）",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
   description: "各平台独播剧",
-  version: "1.0.6", // 升级版本号
+  version: "1.0.7", // 调整了字幕排版逻辑
   requiredVersion: "0.0.1",
   modules: [
     {
       title: "独家原创 & 追更日历",
       functionName: "loadPlatformOriginals",
-      type: "video", // 🎬 升级为竖版海报模式
+      type: "video", // 🎬 竖版海报模式
       requiresWebView: false,
       params: [
         // 1. 平台选择
@@ -159,12 +159,10 @@ async function loadPlatformOriginals(params) {
         let fullDate = item.first_air_date || item.release_date || "1900-01-01";
         let sortDate = fullDate;
         const year = fullDate.substring(0, 4) !== "1900" ? fullDate.substring(0, 4) : "";
-        const genre = getGenreName(item.genre_ids);
+        const genre = getGenreName(item.genre_ids) || (contentType === "movie" ? "电影" : "剧集");
         
-        // 存储我们将要构建的追更专属字段
         let isUpdateMode = false;
         let updateStr = ""; 
-        let epStr = "";
 
         if (needDetails) {
             try {
@@ -176,17 +174,17 @@ async function loadPlatformOriginals(params) {
                     
                     if (targetEp) {
                         isUpdateMode = true;
-                        sortDate = targetEp.air_date; // 使用具体集的日期去排序
-                        fullDate = sortDate; // 覆盖原始首播日期为最新集日期
+                        sortDate = targetEp.air_date; 
+                        fullDate = sortDate; 
                         const shortDate = formatShortDate(sortDate);
-                        epStr = `S${String(targetEp.season_number).padStart(2,'0')}E${String(targetEp.episode_number).padStart(2,'0')}`;
+                        const epStr = `S${String(targetEp.season_number).padStart(2,'0')}E${String(targetEp.episode_number).padStart(2,'0')}`;
                         
                         // ✨ 核心拼接逻辑： 02-26 S01E130 动画
                         updateStr = `${shortDate} ${epStr} ${genre}`;
                     }
                 }
             } catch(e) {
-                // 忽略详情请求错误，走降级
+                // 忽略详情请求错误
             }
         }
 
@@ -197,8 +195,7 @@ async function loadPlatformOriginals(params) {
             _genre: genre,
             _sortDate: sortDate,
             _isUpdateMode: isUpdateMode,
-            _updateStr: updateStr,
-            _epStr: epStr
+            _updateStr: updateStr
         };
     }));
 
@@ -241,19 +238,17 @@ function buildCard(item, contentType) {
     const scoreStr = `⭐ ${scoreNum}`;
     
     let subTitle = "";
-    let genreTitle = "";
     let description = "";
 
-    // ✨ 根据是否是"追更/今日播出"模式，走不同的竖版排版
+    // ✨ 全部信息整合到海报下方 (subTitle)
     if (item._isUpdateMode) {
-        // 追更模式排版
-        genreTitle = item._epStr || item._genre; // 右上角显示集数 (如 S01E04) 或 类型
-        subTitle = item._updateStr;             // 左下角：02-26 S01E130 动画
+        // 追更模式排版：02-26 S01E130 动画
+        subTitle = item._updateStr; 
         description = `${item._updateStr} · ${scoreStr}\n${item.overview || "暂无简介"}`;
     } else {
-        // 常规排版
-        genreTitle = item._genre || (isMovie ? "电影" : "剧集");
-        subTitle = item._fullDate ? `${scoreStr} | ${item._fullDate}` : scoreStr;
+        // 常规排版：2024 · ⭐ 8.5 · 科幻
+        const displayTime = item._fullDate ? item._fullDate.substring(0, 10) : item._year;
+        subTitle = displayTime ? `${displayTime} · ${scoreStr} · ${item._genre}` : `${scoreStr} · ${item._genre}`;
         description = item._fullDate ? `${item._fullDate} · ${scoreStr}\n${item.overview || "暂无简介"}` : (item.overview || "暂无简介");
     }
 
@@ -264,15 +259,13 @@ function buildCard(item, contentType) {
         mediaType: isMovie ? "movie" : "tv",
         title: item.name || item.title || item.original_name,
         
-        genreTitle: genreTitle,
+        genreTitle: "", // Forward 暂不支持右上角，置空即可
         subTitle: subTitle,
         description: description,
         
-        // 🚨 修复竖版海报路径逻辑：强制区分 poster 和 backdrop
         posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
         backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
         
-        // 传给内核的底层数据
         rating: parseFloat(scoreNum) || 0,
         year: item._year || "",
         releaseDate: item._fullDate || ""
