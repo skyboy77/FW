@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "探索发现 | 惊喜推荐",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合【今天看什么】、【Trakt惊喜推荐】与【那年今日】、一站式发现好片。",
-    version: "1.0.4",
+    version: "1.0.5", // 升级版本号
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -18,9 +18,9 @@ WidgetMetadata = {
         },
         {
             name: "traktClientId",
-            title: "Trakt Client ID (选填)",
+            title: "Trakt Client ID",
             type: "input",
-            description: "Trakt 专用，不填则使用公共 ID。",
+            description: "选填，不填则使用内置。Trakt 专用。",
             value: ""
         }
     ],
@@ -32,7 +32,7 @@ WidgetMetadata = {
         {
             title: "今天看什么（完全随机推荐）",
             functionName: "loadRecommendations",
-            type: "list",
+            type: "video", // 升级为 video 模式
             cacheDuration: 0, 
             params: [
                 {
@@ -54,7 +54,7 @@ WidgetMetadata = {
         {
             title: "Trakt惊喜推荐（基于Trakt记录推荐）",
             functionName: "loadRandomMix",
-            type: "list",
+            type: "video", // 升级为 video 模式
             cacheDuration: 21600, // 6小时刷新
             params: [] // 无需额外参数
         },
@@ -65,7 +65,7 @@ WidgetMetadata = {
         {
             title: "那年今日（历史上今天上映电影）",
             functionName: "loadHistoryToday",
-            type: "list",
+            type: "video", // 升级为 video 模式
             cacheDuration: 43200, 
             params: [
                 {
@@ -101,7 +101,8 @@ WidgetMetadata = {
 // 0. 通用工具与字典
 // =========================================================================
 
-const DEFAULT_TRAKT_ID = "003666572e92c4331002a28114387693994e43f5454659f81640a232f08a5996";
+// 更新内置的 Trakt Client ID
+const DEFAULT_TRAKT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
 
 const GENRE_MAP = {
     28: "动作", 12: "冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
@@ -116,20 +117,28 @@ function getGenreText(ids) {
     return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
 }
 
-function buildItem({ id, tmdbId, type, title, year, poster, backdrop, rating, genreText, subTitle, desc }) {
+// --- 适配 Video 横竖版的 buildItem 函数 ---
+function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, genreText, subTitle, desc }) {
     return {
         id: String(id),
         tmdbId: parseInt(tmdbId),
         type: "tmdb",
         mediaType: type,
         title: title,
-        genreTitle: [year, genreText].filter(Boolean).join(" • "), 
-        subTitle: subTitle,
+        
+        // 横版：流派与类型展示
+        genreTitle: genreText || (type === "tv" ? "剧集" : "电影"), 
+        
+        // 竖版：将完整日期和特殊原因(如推荐理由)拼接展示
+        description: date ? `${date} · ${subTitle || '⭐ ' + rating}` : (subTitle || `⭐ ${rating}`),
+        
+        // 传递给内核提取横版年份
+        releaseDate: date,
+        
         posterPath: poster ? `https://image.tmdb.org/t/p/w500${poster}` : "",
         backdropPath: backdrop ? `https://image.tmdb.org/t/p/w780${backdrop}` : "",
-        description: desc || "暂无简介",
-        rating: rating,
-        year: year
+        rating: parseFloat(rating) || 0,
+        subTitle: subTitle // 备用保留
     };
 }
 
@@ -166,13 +175,13 @@ async function loadRecommendations(params = {}) {
     if (!results || results.length === 0) return [{ id: "err", type: "text", title: "未找到推荐" }];
 
     return results.slice(0, 15).map(item => {
-        const year = (item.first_air_date || item.release_date || "").substring(0, 4);
+        const date = item.first_air_date || item.release_date || ""; // 提取完整日期
         const genreText = getGenreText(item.genre_ids);
         
         return buildItem({
             id: item.id, tmdbId: item.id, type: mediaType,
             title: item.name || item.title,
-            year: year,
+            date: date,
             poster: item.poster_path,
             backdrop: item.backdrop_path,
             rating: item.vote_average?.toFixed(1),
@@ -269,13 +278,13 @@ async function loadHistoryToday(params = {}) {
         return buildItem({
             id: item.id, tmdbId: item.id, type: "movie",
             title: item.title,
-            year: item.yearStr,
+            date: item.date, // 传入完整日期
             poster: item.poster_path,
             backdrop: item.backdrop_path,
             rating: item.rating,
             genreText: genreText,
-            subTitle: `TMDB ${item.rating}`,
-            desc: `🏆 ${item.diff}周年纪念 | ${item.overview || "暂无简介"}`
+            subTitle: `🏆 ${item.diff}周年纪念`,
+            desc: item.overview || "暂无简介"
         });
     });
 }
@@ -300,6 +309,7 @@ async function fetchMovieForDate(year, month, day, region, diff) {
         if (!data.results) return [];
         return data.results.map(m => ({
             id: m.id, title: m.title, poster_path: m.poster_path, backdrop_path: m.backdrop_path,
+            date: m.release_date || m.first_air_date || dateStr, // 提取日期
             rating: m.vote_average ? m.vote_average.toFixed(1) : "0.0", overview: m.overview,
             yearStr: String(year), diff: diff, popularity: m.popularity, genre_ids: m.genre_ids || []
         }));
@@ -380,14 +390,14 @@ async function fetchTmdbRecsForSeed(seedItem) {
         if (!data.results) return [];
         return data.results.slice(0, 5).map(item => {
             const genreText = getGenreText(item.genre_ids);
-            const year = (item.first_air_date || "").substring(0, 4);
+            const date = item.first_air_date || item.release_date || ""; // 提取完整日期
             const score = item.vote_average ? item.vote_average.toFixed(1) : "0.0";
             return buildItem({
                 id: item.id, tmdbId: item.id, type: "tv",
                 title: item.name || item.title,
-                year: year, poster: item.poster_path, backdrop: item.backdrop_path, rating: score, genreText: genreText,
+                date: date, poster: item.poster_path, backdrop: item.backdrop_path, rating: score, genreText: genreText,
                 subTitle: `✨ 源于: ${seedItem.title}`,
-                desc: `评分: ${score} | ${item.overview || "暂无简介"}`
+                desc: item.overview || "暂无简介"
             });
         });
     } catch (e) { return []; }
