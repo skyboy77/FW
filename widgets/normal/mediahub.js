@@ -2,19 +2,18 @@ WidgetMetadata = {
     id: "ultimate_media_hub_pro_ui",
     title: "全球影视 | 分流聚合",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    description: "集大成之作：Trakt/豆瓣/平台分流，全线支持【年份•类型】展示。",
-    version: "1.2.1",
+    description: "集大成之作：Trakt/豆瓣/平台分流，全线支持【日期•类型】展示。",
+    version: "1.2.2", // 升级版本号
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
-    // 1. 全局参数 (仅剩 Trakt ID，且选填)
 
     // 1. 全局参数 (仅剩 Trakt ID，且选填)
     globalParams: [
         {
             name: "traktClientId",
-            title: "Trakt Client ID (选填trakt需要)",
+            title: "Trakt Client ID",
             type: "input",
-            description: "Trakt 榜单专用，不填则使用公共 ID。",
+            description: "选填，不填则使用内置。Trakt 榜单专用。",
             value: ""
         }
     ],
@@ -23,7 +22,7 @@ WidgetMetadata = {
         {
             title: "🔥 全球热榜聚合",
             functionName: "loadTrendHub",
-            type: "list",
+            type: "video", // 改为 video 以支持更好的海报排版
             cacheDuration: 3600,
             params: [
                 {
@@ -48,10 +47,10 @@ WidgetMetadata = {
                     name: "traktType",
                     title: "Trakt 类型",
                     type: "enumeration",
-                    value: "all", // 默认全部
+                    value: "all", 
                     belongTo: { paramName: "source", value: ["trakt_trending", "trakt_popular", "trakt_anticipated"] },
                     enumOptions: [
-                        { title: "全部 (剧集+电影)", value: "all" }, // 新增
+                        { title: "全部 (剧集+电影)", value: "all" }, 
                         { title: "剧集", value: "shows" },
                         { title: "电影", value: "movies" }
                     ]
@@ -62,7 +61,7 @@ WidgetMetadata = {
         {
             title: "📺 平台分流片库",
             functionName: "loadPlatformMatrix",
-            type: "list",
+            type: "video", // 改为 video 以支持更好的海报排版
             cacheDuration: 3600,
             params: [
                 {
@@ -111,7 +110,8 @@ WidgetMetadata = {
     ]
 };
 
-const DEFAULT_TRAKT_ID = "003666572e92c4331002a28114387693994e43f5454659f81640a232f08a5996";
+// --- 更新：全新的内置 Trakt Client ID ---
+const DEFAULT_TRAKT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
 
 const GENRE_MAP = {
     28: "动作", 12: "冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
@@ -126,20 +126,28 @@ function getGenreText(ids) {
     return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
 }
 
-function buildItem({ id, tmdbId, type, title, year, poster, backdrop, rating, genreText, subTitle, desc }) {
+// --- 适配 Video 横竖版的 buildItem 函数 ---
+function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, genreText, subTitle, desc }) {
     return {
         id: String(id),
         tmdbId: parseInt(tmdbId),
         type: "tmdb",
         mediaType: type,
         title: title,
-        genreTitle: [year, genreText].filter(Boolean).join(" • "), 
-        subTitle: subTitle, 
+        
+        // 横版：只保留流派和类型
+        genreTitle: genreText || (type === "tv" ? "剧集" : "电影"), 
+        
+        // 竖版：拼接完整的日期和自带的特殊状态信息 (如“豆瓣8.5”或“20人在看”)
+        description: date ? `${date} · ${subTitle || '⭐ ' + rating}` : (subTitle || `⭐ ${rating}`),
+        
+        // 传递给内核提取横版年份
+        releaseDate: date,
+        
         posterPath: poster ? `https://image.tmdb.org/t/p/w500${poster}` : "",
         backdropPath: backdrop ? `https://image.tmdb.org/t/p/w780${backdrop}` : "",
-        description: desc || "暂无简介",
-        rating: rating,
-        year: year
+        rating: parseFloat(rating) || 0,
+        subTitle: subTitle // 备用保留
     };
 }
 
@@ -159,25 +167,15 @@ async function loadTrendHub(params = {}) {
 
         // 1. 混合模式 (All)
         if (traktType === "all") {
-            // 并发请求 Movies 和 Shows (各取10个，混合后20个)
-            // 注意：这里为了分页连贯性，我们还是传 page，但可能导致两边进度不一致
-            // 简单策略：两边都取 page，然后混合排序
             const [movies, shows] = await Promise.all([
                 fetchTraktData("movies", listType, traktClientId, page),
                 fetchTraktData("shows", listType, traktClientId, page)
             ]);
             rawData = [...movies, ...shows];
             
-            // 混合排序 (Trakt 返回通常已按 rank/watchers 排序，我们这里按 watchers 或 list_count 再排一次)
-            // Trending: watchers
-            // Popular: (无特定指标，通常按 rank)
-            // Anticipated: list_count
             rawData.sort((a, b) => {
                 const valA = a.watchers || a.list_count || 0;
                 const valB = b.watchers || b.list_count || 0;
-                // 如果没有指标(popular)，保持原样或随机？
-                // Popular 接口返回 rank 吗？API 文档没细说，通常返回顺序就是 rank。
-                // 简单起见，如果都是 popular，就交错排列
                 if (valA === 0 && valB === 0) return 0;
                 return valB - valA; // 降序
             });
@@ -192,7 +190,6 @@ async function loadTrendHub(params = {}) {
         // 2. 处理数据
         const promises = rawData.slice(0, 20).map(async (item, index) => {
             let subject = item.show || item.movie || item;
-            // 确定类型
             const mediaType = item.show ? "tv" : "movie";
             
             let rank = (page - 1) * 15 + index + 1;
@@ -202,7 +199,6 @@ async function loadTrendHub(params = {}) {
             else if (listType === "anticipated") stats = `❤️ ${item.list_count || 0} 人想看`;
             else stats = `No. ${rank}`; // Popular
 
-            // 混合模式加前缀
             if (traktType === "all") {
                 stats = `[${mediaType === "tv" ? "剧" : "影"}] ${stats}`;
             }
@@ -279,7 +275,7 @@ async function fetchTmdbDiscover(mediaType, params) {
         if (!data.results || data.results.length === 0) return params.page === 1 ? [{ id: "empty", type: "text", title: "暂无数据" }] : [];
         
         return data.results.map(item => {
-            const year = (item.first_air_date || item.release_date || "").substring(0, 4);
+            const date = item.first_air_date || item.release_date || "";
             const genreText = getGenreText(item.genre_ids);
             
             return buildItem({
@@ -287,7 +283,7 @@ async function fetchTmdbDiscover(mediaType, params) {
                 tmdbId: item.id,
                 type: mediaType,
                 title: item.name || item.title,
-                year: year,
+                date: date,
                 poster: item.poster_path,
                 backdrop: item.backdrop_path,
                 rating: item.vote_average?.toFixed(1) || "0.0",
@@ -302,7 +298,7 @@ async function fetchTmdbDiscover(mediaType, params) {
 async function fetchTmdbDetail(id, type, stats, title) {
     try {
         const d = await Widget.tmdb.get(`/${type}/${id}`, { params: { language: "zh-CN" } });
-        const year = (d.first_air_date || d.release_date || "").substring(0, 4);
+        const date = d.first_air_date || d.release_date || "";
         const genreText = (d.genres || []).map(g => g.name).slice(0, 3).join(" / ");
         
         return buildItem({
@@ -310,7 +306,7 @@ async function fetchTmdbDetail(id, type, stats, title) {
             tmdbId: d.id,
             type: type,
             title: d.name || d.title || title,
-            year: year,
+            date: date,
             poster: d.poster_path,
             backdrop: d.backdrop_path,
             rating: d.vote_average?.toFixed(1),
@@ -331,18 +327,22 @@ async function searchTmdb(query, type) {
     } catch (e) { return null; }
 }
 
+// --- 更新：支持混合平台数据的排版融合 ---
 function mergeTmdb(target, source) {
     target.id = String(source.id);
     target.tmdbId = source.id;
     target.posterPath = source.poster_path ? `https://image.tmdb.org/t/p/w500${source.poster_path}` : target.posterPath;
     target.backdropPath = source.backdrop_path ? `https://image.tmdb.org/t/p/w780${source.backdrop_path}` : "";
     
-    const year = (source.first_air_date || source.release_date || "").substring(0, 4);
+    const date = source.first_air_date || source.release_date || "";
     const genreText = getGenreText(source.genre_ids);
     
-    target.genreTitle = [year, genreText].filter(Boolean).join(" • ");
-    target.description = source.overview;
-    target.rating = source.vote_average?.toFixed(1);
+    target.genreTitle = genreText || (target.mediaType === "tv" ? "剧集" : "电影");
+    target.releaseDate = date;
+    
+    // 把豆瓣的评分或者B站的热播状态，跟日期拼在一起展示
+    target.description = date ? `${date} · ${target.subTitle}` : target.subTitle;
+    target.rating = source.vote_average ? parseFloat(source.vote_average) : 0;
 }
 
 // =========================================================================
@@ -351,7 +351,6 @@ function mergeTmdb(target, source) {
 
 async function fetchTraktData(type, list, id, page) {
     try {
-        // 请求 15 个，如果是混合模式，两边各 15 个
         const res = await Widget.http.get(`https://api.trakt.tv/${type}/${list}?limit=15&page=${page}`, {
             headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": id }
         });
@@ -370,10 +369,13 @@ async function fetchDoubanAndMap(tag, type, page) {
         
         const promises = list.map(async (item, i) => {
             const rank = start + i + 1;
+            // 预设基础格式，以防未匹配到 TMDB
             let finalItem = { 
                 id: `db_${item.id}`, type: "tmdb", mediaType: type, 
                 title: `${rank}. ${item.title}`, 
                 subTitle: `豆瓣 ${item.rate}`, 
+                description: `豆瓣 ${item.rate}`,
+                genreTitle: type === "tv" ? "剧集" : "电影",
                 posterPath: item.cover 
             };
             const tmdb = await searchTmdb(item.title, type);
@@ -402,6 +404,8 @@ async function fetchBilibiliRank(type, page) {
                 id: `bili_${rank}`, type: "tmdb", mediaType: "tv", 
                 title: `${rank}. ${item.title}`, 
                 subTitle: item.new_ep?.index_show || "热播中", 
+                description: item.new_ep?.index_show || "热播中",
+                genreTitle: "剧集",
                 posterPath: item.cover 
             };
             const tmdb = await searchTmdb(item.title, "tv");
@@ -425,6 +429,8 @@ async function fetchBangumiDaily() {
                 id: `bgm_${item.id}`, type: "tmdb", mediaType: "tv", 
                 title: name, 
                 subTitle: item.name, 
+                description: item.name,
+                genreTitle: "剧集",
                 posterPath: item.images?.large 
             };
             const tmdb = await searchTmdb(name, "tv");
@@ -440,12 +446,12 @@ async function fetchTmdbFallback(traktType) {
     try {
         const r = await Widget.tmdb.get(`/trending/${type}/day`, { params: { language: "zh-CN" } });
         return (r.results || []).slice(0, 15).map(item => {
-            const year = (item.first_air_date || item.release_date || "").substring(0, 4);
+            const date = item.first_air_date || item.release_date || "";
             const genreText = getGenreText(item.genre_ids);
             return buildItem({
                 id: item.id, tmdbId: item.id, type: type,
                 title: item.name || item.title,
-                year: year,
+                date: date,
                 genreText: genreText,
                 poster: item.poster_path,
                 subTitle: "TMDB Trending",
