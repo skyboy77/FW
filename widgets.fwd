@@ -157,6 +157,15 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/VodMax.js"
     },
     {
+      "id": "makka_global_networks",
+      "title": "全球影视平台",
+      "description": "全网最全的频道聚合：覆盖爱优腾、网飞、HBO、韩国tvN及各大卫视",
+      "requiredVersion": "0.0.1",
+      "version": "1.2.0",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/ALLINONE.js"
+    },
+    {
       "id": "imdb_cn_fix_",
       "title": "IMDb热榜",
       "description": "IMDb全球榜单，支持日/周纬度切换。",
