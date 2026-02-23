@@ -3,18 +3,17 @@ WidgetMetadata = {
     title: "全球追剧时刻表",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合全球剧集更新表&综艺排期&bangumi动漫周更表。",
-    version: "2.1.0", // 适配 Forward 竖版海报及防年份重复拼接
+    version: "2.1.1", // 完美适配横竖版底层字段
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
     
-    // 已移除 globalParams 输入框，直接使用内置 ID
     globalParams: [],
 
     modules: [
         {
             title: "追剧日历 (Drama)",
             functionName: "loadTvCalendar",
-            type: "video", // 🎬 改为竖版海报
+            type: "video", // 可随意切换为 list
             cacheDuration: 3600,
             params: [
                 {
@@ -49,7 +48,7 @@ WidgetMetadata = {
         {
             title: "综艺时刻 (Variety)",
             functionName: "loadVarietyCalendar",
-            type: "video", // 🎬 改为竖版海报
+            type: "video", // 可随意切换为 list
             cacheDuration: 3600,
             params: [
                 {
@@ -81,7 +80,7 @@ WidgetMetadata = {
         {
             title: "动漫周更 (Anime)",
             functionName: "loadBangumiCalendar",
-            type: "video", // 🎬 改为竖版海报
+            type: "video", // 可随意切换为 list
             cacheDuration: 3600,
             params: [
                 {
@@ -110,7 +109,6 @@ WidgetMetadata = {
 // 0. 通用工具与字典
 // =========================================================================
 
-// 内置你提供的最新 Trakt Client ID
 const DEFAULT_TRAKT_ID = "95b59922670c84040db3632c7aac6f33704f6ffe5cbf3113a056e37cb45cb482";
 
 const GENRE_MAP = {
@@ -126,8 +124,8 @@ function getGenreText(ids) {
     return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 1).join("");
 }
 
-// ✨ 核心渲染拦截函数
-function buildItem({ id, tmdbId, type, title, poster, backdrop, rating, subTitle, desc }) {
+// ✨ 核心渲染拦截函数：恢复 year 和 releaseDate 的赋值
+function buildItem({ id, tmdbId, type, title, poster, backdrop, rating, subTitle, desc, year, releaseDate }) {
     const fullPoster = poster && poster.startsWith("http") ? poster : (poster ? `https://image.tmdb.org/t/p/w500${poster}` : "");
     const fullBackdrop = backdrop && backdrop.startsWith("http") ? backdrop : (backdrop ? `https://image.tmdb.org/t/p/w780${backdrop}` : "");
 
@@ -138,7 +136,7 @@ function buildItem({ id, tmdbId, type, title, poster, backdrop, rating, subTitle
         mediaType: type,
         title: title,
         
-        // ✨ 将组装好的字符直接给这两个字段，并清空 year 以防 Forward 自动画蛇添足
+        // 副标题内容：只传 "今天 科幻"，横版时 Forward 会自动加上 "2026 • "
         genreTitle: subTitle, 
         subTitle: subTitle,
         
@@ -146,8 +144,10 @@ function buildItem({ id, tmdbId, type, title, poster, backdrop, rating, subTitle
         backdropPath: fullBackdrop,
         description: `${subTitle} · ⭐ ${rating}\n${desc || "暂无简介"}`,
         rating: parseFloat(rating) || 0,
-        year: "", // 🚨 强制清空
-        releaseDate: ""
+        
+        // 关键字段恢复
+        year: year || "",             // 负责横版榜单的最前面年份
+        releaseDate: releaseDate || "" // 负责竖版海报下方的完整日期显示
     };
 }
 
@@ -195,11 +195,14 @@ async function loadBangumiCalendar(params = {}) {
                 backdrop: "",
                 rating: item.rating?.score?.toFixed(1) || "0.0",
                 genreText: "动画",
-                desc: item.summary
+                desc: item.summary,
+                year: "",
+                releaseDate: ""
             };
 
             const tmdbItem = await searchTmdbBestMatch(title, item.name);
             if (tmdbItem) {
+                const fullDate = tmdbItem.first_air_date || "";
                 itemData.id = String(tmdbItem.id);
                 itemData.tmdbId = tmdbItem.id;
                 itemData.poster = tmdbItem.poster_path || cover; 
@@ -207,10 +210,12 @@ async function loadBangumiCalendar(params = {}) {
                 itemData.genreText = getGenreText(tmdbItem.genre_ids) || "动画";
                 itemData.desc = tmdbItem.overview || itemData.desc;
                 itemData.rating = tmdbItem.vote_average?.toFixed(1) || itemData.rating;
+                itemData.year = fullDate.substring(0, 4);
+                itemData.releaseDate = fullDate; // 为竖版海报提供日期
             }
             
-            // ✨ 拼接: 周一 • 动画
-            const displaySubtitle = `${dayName} • ${itemData.genreText}`;
+            // ✨ 拼接: 周一 动画（横版会自动拼成 2026 • 周一 动画）
+            const displaySubtitle = `${dayName} ${itemData.genreText}`;
 
             return buildItem({
                 ...itemData,
@@ -258,20 +263,23 @@ async function loadTvCalendar(params = {}) {
         if (!data.results || data.results.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "暂无更新" }] : [];
 
         return data.results.map(item => {
-            const dateStr = item[dateField] || "";
-            const shortDate = dateStr.slice(5); // 02-23
+            const fullDate = item[dateField] || ""; // e.g. 2026-02-23
+            const yearStr = fullDate.substring(0, 4);
+            const shortDate = fullDate.slice(5).replace("-", "/"); // e.g. 02/23
             const genreText = getGenreText(item.genre_ids) || "剧集";
             
-            // ✨ 拼接: 今日 • 剧情 或 02-23 • 剧情
-            let timeLabel = mode === "update_today" ? "今日" : shortDate;
-            const displaySubtitle = timeLabel ? `${timeLabel} • ${genreText}` : genreText;
+            // ✨ 拼接: 今天 科幻 或 02/23 科幻
+            let timeLabel = mode === "update_today" ? "今天" : shortDate;
+            const displaySubtitle = timeLabel ? `${timeLabel} ${genreText}` : genreText;
 
             return buildItem({
                 id: item.id, tmdbId: item.id, type: "tv",
                 title: item.name, poster: item.poster_path, backdrop: item.backdrop_path,
                 rating: item.vote_average?.toFixed(1),
                 subTitle: displaySubtitle, 
-                desc: item.overview
+                desc: item.overview,
+                year: yearStr,           // 传给横版拼年份
+                releaseDate: fullDate    // 传给竖版显日期
             });
         });
     } catch (e) { return [{ id: "err", type: "text", title: "网络错误" }]; }
@@ -362,18 +370,22 @@ async function fetchTmdbVariety(region, dateStr) {
         if (!data.results) return [];
 
         return data.results.map(item => {
+            const fullDate = item.first_air_date || dateStr || "";
+            const yearStr = fullDate.substring(0, 4);
             const genreText = getGenreText(item.genre_ids) || "综艺";
-            const shortDate = dateStr ? dateStr.substring(5) : "";
+            const shortDate = dateStr ? dateStr.substring(5).replace("-", "/") : "";
             
-            // ✨ 拼接: 02-23 • 综艺 或 近期热播 • 综艺
-            const displaySubtitle = shortDate ? `${shortDate} • ${genreText}` : `热播 • ${genreText}`;
+            // ✨ 拼接: 02/23 综艺
+            const displaySubtitle = shortDate ? `${shortDate} ${genreText}` : `近期热播 ${genreText}`;
 
             return buildItem({
                 id: item.id, tmdbId: item.id, type: "tv",
                 title: item.name, poster: item.poster_path, backdrop: item.backdrop_path,
                 rating: item.vote_average?.toFixed(1), 
                 subTitle: displaySubtitle, 
-                desc: item.overview
+                desc: item.overview,
+                year: yearStr,
+                releaseDate: fullDate
             });
         });
     } catch (e) { return []; }
@@ -384,13 +396,16 @@ async function fetchTmdbDetail(tmdbId, traktItem) {
         const d = await Widget.tmdb.get(`/tv/${tmdbId}`, { params: { language: "zh-CN" } });
         if (!d) return null;
         
+        const fullDate = d.first_air_date || traktItem.first_aired?.substring(0, 10) || "";
+        const yearStr = fullDate.substring(0, 4);
+        
         const ep = traktItem.episode;
         const s = String(ep.season).padStart(2,'0');
         const e = String(ep.number).padStart(2,'0');
         const genreText = getGenreText(d.genres?.map(g=>g.id)) || "综艺";
         
-        // ✨ Trakt专属精确集数拼接: S01-E05 • 综艺
-        const displaySubtitle = `S${s}-E${e} • ${genreText}`;
+        // ✨ Trakt专属: S01-E05 综艺
+        const displaySubtitle = `S${s}-E${e} ${genreText}`;
 
         return buildItem({
             id: d.id, tmdbId: d.id, type: "tv",
@@ -398,7 +413,9 @@ async function fetchTmdbDetail(tmdbId, traktItem) {
             poster: d.poster_path, backdrop: d.backdrop_path,
             rating: d.vote_average?.toFixed(1),
             subTitle: displaySubtitle,
-            desc: d.overview
+            desc: d.overview,
+            year: yearStr,
+            releaseDate: fullDate
         });
     } catch (e) { return null; }
 }
