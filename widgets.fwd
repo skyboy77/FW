@@ -104,10 +104,10 @@
     },
     {
       "id": "makka.platform.originals",
-      "title": "流媒体·独家原创（更新时间版）",
+      "title": "流媒体·独家原创Pro（更新时间版）",
       "description": "各平台独播剧",
       "requiredVersion": "0.0.1",
-      "version": "1.0.5",
+      "version": "1.0.9",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/liumeititime.js"
     },
@@ -116,7 +116,7 @@
       "title": "流媒体·独家原创",
       "description": "发现Netflix/HBO/腾讯/B站等平台自制内容",
       "requiredVersion": "0.0.1",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/liumeiti.js"
     },
