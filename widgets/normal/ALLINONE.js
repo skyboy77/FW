@@ -9,7 +9,7 @@ WidgetMetadata = {
     title: "全球影视平台ALL IN ONE",
     description: "全网最全的频道聚合：覆盖爱优腾、网飞、HBO、韩国tvN及各大卫视",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.2.2", // 🚀 升级：引入防截断与双海报极简排版规范
+    version: "1.2.3", // 🚀 升级：引入防截断与双海报极简排版规范
     requiredVersion: "0.0.1",
     modules: [
         {
@@ -88,10 +88,10 @@ const PLATFORM_MAP = {
     apple:   { network: "2552", provider: "350", region: "US", name: "Apple TV+" },
     amazon:  { network: "1024", provider: "119", region: "US", name: "Amazon" },
     tencent: { network: "2007|3353", provider: "138", region: "CN", name: "腾讯" },
-    iqiyi:   { network: "3088|3185", provider: "238", region: "CN", name: "爱奇艺" },
-    youku:   { network: "3084", provider: "331", region: "CN", name: "优酷" },
-    mango:   { network: "3186", provider: "1944", region: "CN", name: "芒果" },
-    bilibili:{ network: "3152|3625", provider: "2280", region: "CN", name: "B站" },
+    iqiyi:   { network: "1330", provider: "238", region: "CN", name: "爱奇艺" },
+    youku:   { network: "1419", provider: "331", region: "CN", name: "优酷" },
+    mango:   { network: "1631", provider: "1944", region: "CN", name: "芒果" },
+    bilibili:{ network: "1605", provider: "2280", region: "CN", name: "B站" },
     hunan:   { network: "952", provider: null, region: "CN", name: "湖南卫视" },
     zhejiang:{ network: "989", provider: null, region: "CN", name: "浙江卫视" },
     dragon:  { network: "1056", provider: null, region: "CN", name: "东方卫视" },
