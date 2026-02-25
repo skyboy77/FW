@@ -9,13 +9,13 @@ WidgetMetadata = {
     title: "全球影视专区",
     description: "自由切换全球十几个国家与地区，探索纯正的本土电影与剧集",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.0.0", // 🚀 极简排版版：回归系统原生截断逻辑，内置横竖版双海报
+    version: "1.1.0", // 🚀 修复：更换为 video 类型并使用 posterPath，完美适配二级页面自适应排版
     requiredVersion: "0.0.1",
     modules: [
         {
             title: "全球探索发现",
             functionName: "loadGlobalList",
-            type: "list",
+            type: "video", // 🔑 真凶 1 解决：将 "list" 改为 "video"，唤醒框架智能 UI 切换逻辑
             cacheDuration: 3600,
             params: [
                 {
@@ -87,7 +87,7 @@ function buildItem(item, forceMediaType) {
     
     const mediaType = forceMediaType || item.media_type || (item.title ? "movie" : "tv");
     const title = item.title || item.name;
-    const releaseDate = item.release_date || item.first_air_date || ""; // 提取完整日期，如 2005-03-04
+    const releaseDate = item.release_date || item.first_air_date || ""; // 提取完整日期
     const score = item.vote_average ? item.vote_average.toFixed(1) : "暂无";
     const genreText = getGenreText(item.genre_ids) || "影视";
     
@@ -100,16 +100,16 @@ function buildItem(item, forceMediaType) {
         mediaType: mediaType,
         title: title,
         
-        // 👇 核心排版：利用系统原生逻辑
-        releaseDate: releaseDate, // 丢给 fw：竖版自动截断为 2005，横版保留完整 2005-03-04
-        genreTitle: genreText,    // 丢给 fw：横版自动拼接在日期后面 (2005-03-04 • 动作)
-        subTitle: "",             // 置空，保持清爽
+        // 排版逻辑保持不变，交给框架
+        releaseDate: releaseDate, 
+        genreTitle: genreText,    
+        subTitle: "",             
         
-        // 👇 横竖双海报机制
-        // fw 竖向排版时调用 coverUrl，横向排版时调用 backdropPath
-        coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "", // 竖版
-        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "", // 横版
+        // 🔑 真凶 2 解决：彻底抛弃 coverUrl，严格使用 posterPath
+        posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "", // 竖版海报
+        backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "", // 横版海报
         
+        // 竖版显示在底部的灰色小字
         description: `${typeTag} | ⭐ ${score}\n${item.overview || "暂无简介"}`,
         rating: item.vote_average || 0,
         
