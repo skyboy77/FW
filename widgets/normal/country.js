@@ -1,19 +1,15 @@
-// =========================================================================
-// 1. Widget Metadata (组件元数据)
-// =========================================================================
-
 WidgetMetadata = {
-    id: "global_genre_hub",
+    id: "global_genre_hub_country",
     title: "全球类型精选",
-    author: "编码助手",
+    author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "强大的多维度影视筛选，支持按类型、国家、排序规则发现好剧好片。",
-    version: "1.0.0",
+    version: "1.0.1", // 更新了版本号
     requiredVersion: "0.0.1",
     modules: [
         {
             title: "🏷️ 高级类型榜单",
             functionName: "loadGenreRank",
-            type: "video", // 推荐使用 video 竖版海报流
+            type: "video", 
             cacheDuration: 3600,
             params: [
                 {
@@ -85,7 +81,8 @@ WidgetMetadata = {
                         { title: "📅 最新上线", value: "time" }
                     ]
                 },
-                { name: "page", title: "页码", type: "page" }
+                // ✨ 修复 1：显式声明 startPage 为 1，引导内核正确触发分页
+                { name: "page", title: "页码", type: "page", startPage: 1 }
             ]
         }
     ]
@@ -95,22 +92,20 @@ WidgetMetadata = {
 // 2. 核心业务逻辑 (Handler Functions)
 // =========================================================================
 
-// 影视流派在 TMDB 中的 ID 映射表 (电影和剧集的 ID 略有不同)
 const GENRE_MAP = {
-    "scifi": { movie: "878", tv: "10765" },       // 电影:科幻 | 剧集:科幻&奇幻
+    "scifi": { movie: "878", tv: "10765" },       
     "mystery": { movie: "9648", tv: "9648" },
-    "horror": { movie: "27", tv: "27" },          // 注意：TMDB 的剧集较少使用纯恐怖标签，但 27 通用
+    "horror": { movie: "27", tv: "27" },          
     "crime": { movie: "80", tv: "80" },
-    "action": { movie: "28", tv: "10759" },       // 电影:动作 | 剧集:动作&冒险
+    "action": { movie: "28", tv: "10759" },       
     "comedy": { movie: "35", tv: "35" },
-    "romance": { movie: "10749", tv: "10749" },   // 剧集其实很少用这个，多用剧情
+    "romance": { movie: "10749", tv: "10749" },   
     "drama": { movie: "18", tv: "18" },
-    "fantasy": { movie: "14", tv: "10765" },      // 电影:奇幻 | 剧集:合并在科幻&奇幻中
+    "fantasy": { movie: "14", tv: "10765" },      
     "animation": { movie: "16", tv: "16" },
     "documentary": { movie: "99", tv: "99" }
 };
 
-// 国家/地区 ISO 3166-1 映射表 (多国家用 | 隔开表示“或”)
 const REGION_MAP = {
     "all": "",
     "cn": "CN",
@@ -135,29 +130,25 @@ const REGION_MAP = {
     "latin": "ES|MX|AR|CO|CL|PE|VE"
 };
 
-/**
- * 主获取函数
- */
 async function loadGenreRank(params = {}) {
+    // ✨ 修复 2：强制将传入的 page 转换为整数，防止内核传字符串导致分页失效
+    const page = parseInt(params.page) || 1;
+    
+    // ✨ 添加调试日志：让你能在控制台清楚看到有没有触发下一页
+    console.log(`[GenreHub] 正在请求第 ${page} 页的数据...`);
+
     const { mediaType = "movie", genre = "scifi", region = "all", sortBy = "popularity" } = params;
-    const page = params.page || 1;
 
-    // 1. 获取对应的 Genre ID
     const genreId = GENRE_MAP[genre] ? GENRE_MAP[genre][mediaType] : "";
-
-    // 2. 获取对应的地区代码
     const originCountry = REGION_MAP[region] || "";
 
-    // 3. 处理排序规则
     let tmdbSortBy = "popularity.desc";
     if (sortBy === "rating") {
         tmdbSortBy = "vote_average.desc";
     } else if (sortBy === "time") {
-        // 电影用 release_date，剧集用 first_air_date
         tmdbSortBy = mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc";
     }
 
-    // 4. 构建 TMDB Discover 请求参数
     const queryParams = {
         language: "zh-CN",
         page: page,
@@ -166,25 +157,15 @@ async function loadGenreRank(params = {}) {
         include_video: false
     };
 
-    // 只有当 genreId 存在时才添加 (防护)
-    if (genreId) {
-        queryParams.with_genres = genreId;
-    }
+    if (genreId) queryParams.with_genres = genreId;
+    if (originCountry) queryParams.with_origin_country = originCountry;
 
-    // 只有当 region 不是全平时才添加
-    if (originCountry) {
-        queryParams.with_origin_country = originCountry;
-    }
-
-    // ⭐ 质量防雷：如果是按评分排序，强制要求至少有 200 人评分过
     if (sortBy === "rating") {
         queryParams["vote_count.gte"] = 200; 
     } else {
-        // 其他排序稍微过滤掉毫无知名度的垃圾数据
         queryParams["vote_count.gte"] = 10; 
     }
 
-    // ⭐ 时间防雷：如果是按时间最新排序，限制时间不超过未来的一个月，防止查到几年后才上映的占位假数据
     if (sortBy === "time") {
         const today = new Date();
         today.setMonth(today.getMonth() + 1);
@@ -198,7 +179,6 @@ async function loadGenreRank(params = {}) {
     }
 
     try {
-        // 5. 发起请求
         const res = await Widget.tmdb.get(`/discover/${mediaType}`, { params: queryParams });
         const items = res.results || [];
 
@@ -206,7 +186,6 @@ async function loadGenreRank(params = {}) {
             return page === 1 ? [{ id: "empty", type: "text", title: "未找到符合条件的影视", description: "请尝试更换国家或类型" }] : [];
         }
 
-        // 6. 格式化数据并返回
         return items.map(item => {
             const date = item.release_date || item.first_air_date || "";
             const year = date ? date.substring(0, 4) : "未知";
@@ -218,13 +197,10 @@ async function loadGenreRank(params = {}) {
                 type: "tmdb",
                 mediaType: mediaType,
                 title: item.title || item.name,
-                
-                // 拼接副标题和简介，使其适应横/竖版 UI
                 subTitle: `⭐ ${score} | ${year}`,
                 description: `${date} · ⭐ ${score}\n${item.overview || "暂无简介"}`,
                 releaseDate: date,
                 year: year,
-                
                 posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
                 backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
                 rating: parseFloat(score) || 0
