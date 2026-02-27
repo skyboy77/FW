@@ -3,10 +3,9 @@ WidgetMetadata = {
     title: "全球影视 | 分流聚合",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "集大成之作：Trakt/豆瓣/平台分流，全线支持【日期•类型】展示。",
-    version: "1.3.1", // 升级版本号
+    version: "1.3.2", // 升级版本号
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
-
     // 1. 全局参数 (仅剩 Trakt ID，且选填)
     globalParams: [
         {
@@ -368,11 +367,11 @@ async function fetchDoubanAndMap(tag, type, page) {
         if (list.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "暂无数据" }] : [];
         
         const promises = list.map(async (item, i) => {
-            const rank = start + i + 1;
             // 预设基础格式，以防未匹配到 TMDB
+            // 修改点：去掉了 title 前面的 ${rank}.
             let finalItem = { 
                 id: `db_${item.id}`, type: "tmdb", mediaType: type, 
-                title: `${rank}. ${item.title}`, 
+                title: item.title, 
                 subTitle: `豆瓣🫛 ${item.rate}`, 
                 description: `豆瓣 ${item.rate}`,
                 genreTitle: type === "tv" ? "剧集" : "电影",
@@ -400,9 +399,10 @@ async function fetchBilibiliRank(type, page) {
         
         const promises = list.map(async (item, i) => {
             const rank = start + i + 1;
+            // 修改点：去掉了 title 前面的 ${rank}.
             let finalItem = { 
                 id: `bili_${rank}`, type: "tmdb", mediaType: "tv", 
-                title: `${rank}. ${item.title}`, 
+                title: item.title, 
                 subTitle: item.new_ep?.index_show || "热播中", 
                 description: item.new_ep?.index_show || "热播中",
                 genreTitle: "剧集",
