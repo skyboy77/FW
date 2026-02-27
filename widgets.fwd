@@ -107,7 +107,7 @@
       "title": "全球影视 | 分流聚合",
       "description": "集大成之作：Trakt/豆瓣/平台分流，全线支持【日期•类型】展示。",
       "requiredVersion": "0.0.1",
-      "version": "1.3.0",
+      "version": "1.3.1",
       "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/mediahub.js"
     },
