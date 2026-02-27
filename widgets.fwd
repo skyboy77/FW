@@ -112,6 +112,15 @@
       "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/mediahub.js"
     },
     {
+      "id": "ultimate_media_repair_ui",
+      "title": "全球影视 | 分流聚合（防风控版）",
+      "description": "防风控版本，提供给这个模块的普通版有问题的人使用。",
+      "requiredVersion": "0.0.1",
+      "version": "1.3.5",
+      "author": "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+      "url": "https://raw.githubusercontent.com/MakkaPakka518/FW/refs/heads/main/widgets/normal/mediahubrepair.js"
+    },
+    {
       "id": "makka.platform.originals",
       "title": "流媒体·独家原创Pro（更新时间版）",
       "description": "各平台独播剧",
