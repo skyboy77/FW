@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全球影视 | 分流聚合",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "集大成之作：Trakt/豆瓣/平台分流，全线支持【日期•类型】展示。",
-    version: "1.3.2", // 升级版本号
+    version: "1.3.3", // 升级版本号
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
     // 1. 全局参数 (仅剩 Trakt ID，且选填)
@@ -127,6 +127,10 @@ function getGenreText(ids) {
 
 // --- 适配 Video 横竖版的 buildItem 函数 ---
 function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, genreText, subTitle, desc }) {
+    // 【修复点1】将评分/日期信息和剧情简介拼接在一起，用 \n 换行
+    const baseInfo = date ? `${date} · ${subTitle || '⭐ ' + rating}` : (subTitle || `⭐ ${rating}`);
+    const overview = desc ? `\n${desc}` : "\n暂无简介";
+
     return {
         id: String(id),
         tmdbId: parseInt(tmdbId),
@@ -137,8 +141,8 @@ function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, ge
         // 横版：只保留流派和类型
         genreTitle: genreText || (type === "tv" ? "剧集" : "电影"), 
         
-        // 竖版：拼接完整的日期和自带的特殊状态信息 (如“豆瓣8.5”或“20人在看”)
-        description: date ? `${date} · ${subTitle || '⭐ ' + rating}` : (subTitle || `⭐ ${rating}`),
+        // 竖版：展示 评分+日期 \n 剧情简介
+        description: baseInfo + overview,
         
         // 传递给内核提取横版年份
         releaseDate: date,
@@ -288,7 +292,7 @@ async function fetchTmdbDiscover(mediaType, params) {
                 rating: item.vote_average?.toFixed(1) || "0.0",
                 genreText: genreText,
                 subTitle: `⭐ ${item.vote_average?.toFixed(1)}`,
-                desc: item.overview
+                desc: item.overview // 这里正常传入了简介
             });
         });
     } catch (e) { return [{ id: "err", type: "text", title: "加载失败" }]; }
@@ -311,7 +315,7 @@ async function fetchTmdbDetail(id, type, stats, title) {
             rating: d.vote_average?.toFixed(1),
             genreText: genreText,
             subTitle: stats,
-            desc: d.overview
+            desc: d.overview // 这里正常传入了简介
         });
     } catch (e) { return null; }
 }
@@ -339,8 +343,11 @@ function mergeTmdb(target, source) {
     target.genreTitle = genreText || (target.mediaType === "tv" ? "剧集" : "电影");
     target.releaseDate = date;
     
-    // 把豆瓣的评分或者B站的热播状态，跟日期拼在一起展示
-    target.description = date ? `${date} · ${target.subTitle}` : target.subTitle;
+    // 【修复点2】合并数据时，也要把 TMDB 查到的 overview 剧情拼接到末尾
+    const baseInfo = date ? `${date} · ${target.subTitle}` : target.subTitle;
+    const overview = source.overview ? `\n${source.overview}` : "\n暂无简介";
+    target.description = baseInfo + overview;
+    
     target.rating = source.vote_average ? parseFloat(source.vote_average) : 0;
 }
 
@@ -367,13 +374,12 @@ async function fetchDoubanAndMap(tag, type, page) {
         if (list.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "暂无数据" }] : [];
         
         const promises = list.map(async (item, i) => {
-            // 预设基础格式，以防未匹配到 TMDB
-            // 修改点：去掉了 title 前面的 ${rank}.
+            // 【修复点3】兜底 description，防止没搜到 TMDB 数据时没有简介占位
             let finalItem = { 
                 id: `db_${item.id}`, type: "tmdb", mediaType: type, 
                 title: item.title, 
                 subTitle: `豆瓣🫛 ${item.rate}`, 
-                description: `豆瓣 ${item.rate}`,
+                description: `豆瓣 ${item.rate}\n暂无简介`, // 预设的占位格式
                 genreTitle: type === "tv" ? "剧集" : "电影",
                 posterPath: item.cover 
             };
@@ -399,12 +405,12 @@ async function fetchBilibiliRank(type, page) {
         
         const promises = list.map(async (item, i) => {
             const rank = start + i + 1;
-            // 修改点：去掉了 title 前面的 ${rank}.
+            // 【修复点3】兜底 description
             let finalItem = { 
                 id: `bili_${rank}`, type: "tmdb", mediaType: "tv", 
                 title: item.title, 
                 subTitle: item.new_ep?.index_show || "热播中", 
-                description: item.new_ep?.index_show || "热播中",
+                description: `${item.new_ep?.index_show || "热播中"}\n暂无简介`, // 预设的占位格式
                 genreTitle: "剧集",
                 posterPath: item.cover 
             };
@@ -425,11 +431,12 @@ async function fetchBangumiDaily() {
         
         const promises = items.map(async item => {
             const name = item.name_cn || item.name;
+            // 【修复点3】兜底 description
             let finalItem = { 
                 id: `bgm_${item.id}`, type: "tmdb", mediaType: "tv", 
                 title: name, 
                 subTitle: item.name, 
-                description: item.name,
+                description: `${item.name}\n暂无简介`, // 预设的占位格式
                 genreTitle: "剧集",
                 posterPath: item.images?.large 
             };
@@ -455,7 +462,8 @@ async function fetchTmdbFallback(traktType) {
                 genreText: genreText,
                 poster: item.poster_path,
                 subTitle: "TMDB Trending",
-                rating: item.vote_average?.toFixed(1)
+                rating: item.vote_average?.toFixed(1),
+                desc: item.overview // 【修复点4】将简介字段补上
             });
         });
     } catch(e) { return []; }
