@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全球影视 | 分流聚合",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "集大成之作：Trakt/豆瓣/平台分流，全线支持【日期•类型】展示。",
-    version: "1.3.0", // 升级版本号
+    version: "1.3.1", // 升级版本号
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -373,7 +373,7 @@ async function fetchDoubanAndMap(tag, type, page) {
             let finalItem = { 
                 id: `db_${item.id}`, type: "tmdb", mediaType: type, 
                 title: `${rank}. ${item.title}`, 
-                subTitle: `豆瓣 ${item.rate}`, 
+                subTitle: `豆瓣🫛 ${item.rate}`, 
                 description: `豆瓣 ${item.rate}`,
                 genreTitle: type === "tv" ? "剧集" : "电影",
                 posterPath: item.cover 
