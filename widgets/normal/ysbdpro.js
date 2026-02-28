@@ -2,7 +2,7 @@ WidgetMetadata = {
   id: "ysbd..media.makka",
   title: "影视榜单Pro",
   description: "聚合豆瓣、TMDB、IMDB & Bangumi",
-  author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
+  author: "阿米诺斯｜𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
   version: "1.0.0",
   requiredVersion: "0.0.1",
   detailCacheDuration: 60,
