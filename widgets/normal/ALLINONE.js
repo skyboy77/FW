@@ -4,12 +4,12 @@
  * 涵盖: 国内爱优腾芒、四大卫视、港台本土平台、韩国三大台、以及网飞/HBO等国际巨头
  */
 
-WidgetMetadata = {
+var WidgetMetadata = {
     id: "makka_global_networks",
     title: "全球影视平台ALL IN ONE",
     description: "全网最全的频道聚合：覆盖爱优腾、网飞、HBO、韩国tvN及各大卫视",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.2.3", // 🚀 升级：引入防截断与双海报极简排版规范
+    version: "1.2.4", // 🚀 升级：把频道/平台选择移至右上角快捷菜单
     requiredVersion: "0.0.1",
     modules: [
         {
@@ -19,7 +19,7 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    name: "platform",
+                    name: "sort_by", // 👈 魔法字段：把这70多个平台的选择提到右上角！
                     title: "选择频道/平台",
                     type: "enumeration",
                     value: "netflix",
@@ -161,7 +161,8 @@ function buildItem(item, isMovie, platformName) {
 // ================= 2. 核心请求逻辑 =================
 
 async function loadPlatformList(params) {
-    const platform = params.platform || "netflix";
+    // 👈 逻辑接管：从 sort_by 获取 platform 选择
+    const platform = params.sort_by || "netflix";
     const mediaType = params.mediaType || "tv";
     const category = params.sortBy || "hot";
     const page = params.page || 1;
