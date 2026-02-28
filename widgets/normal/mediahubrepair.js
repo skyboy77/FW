@@ -8,7 +8,7 @@ WidgetMetadata = {
     title: "全球影视 | 分流聚合（防风控版）",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "防风控版本，提供给这个模块的普通版有问题的人使用。",
-    version: "1.3.5", // 升级版本号：加入豆瓣终极防风控策略
+    version: "1.3.6", // 🚀 升级版本号：双模块均接入右上角快速切换菜单
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
     
@@ -31,7 +31,8 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    name: "source",
+                    // 👈 核心修改1：将 source 改为 sort_by 以触发右上角菜单
+                    name: "sort_by",
                     title: "选择榜单",
                     type: "enumeration",
                     value: "trakt_trending",
@@ -53,7 +54,8 @@ WidgetMetadata = {
                     title: "Trakt 类型",
                     type: "enumeration",
                     value: "all", 
-                    belongTo: { paramName: "source", value: ["trakt_trending", "trakt_popular", "trakt_anticipated"] },
+                    // 👈 同步修改联动依赖，确保只有选 Trakt 时才显示此选项
+                    belongTo: { paramName: "sort_by", value: ["trakt_trending", "trakt_popular", "trakt_anticipated"] },
                     enumOptions: [
                         { title: "全部 (剧集+电影)", value: "all" }, 
                         { title: "剧集", value: "shows" },
@@ -70,7 +72,8 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    name: "platformId",
+                    // 👈 核心修改2：将 platformId 改为 sort_by 以触发右上角菜单
+                    name: "sort_by",
                     title: "播出平台",
                     type: "enumeration",
                     value: "2007",
@@ -165,7 +168,9 @@ function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, ge
 // =========================================================================
 
 async function loadTrendHub(params = {}) {
-    const { source, traktType = "all" } = params;
+    // 👈 逻辑接管：获取右上角选中的榜单
+    const source = params.sort_by || "trakt_trending";
+    const traktType = params.traktType || "all";
     const page = params.page || 1; 
     const traktClientId = params.traktClientId || DEFAULT_TRAKT_ID;
 
@@ -240,7 +245,10 @@ async function loadTrendHub(params = {}) {
 }
 
 async function loadPlatformMatrix(params = {}) {
-    const { platformId, category = "tv_drama", sort = "popularity.desc" } = params;
+    // 👈 逻辑接管：获取右上角选中的平台
+    const platformId = params.sort_by || "2007";
+    const category = params.category || "tv_drama";
+    const sort = params.sort || "popularity.desc";
     const page = params.page || 1;
 
     const foreignPlatforms = ["213", "2739", "49", "2552"];
@@ -250,7 +258,7 @@ async function loadPlatformMatrix(params = {}) {
 
     const queryParams = {
         language: "zh-CN",
-        sort_by: sort,
+        sort_by: sort, // 排序方式，继续使用安全的 sort
         page: page,
         include_adult: false,
         include_null_first_air_dates: false
