@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "欧美风向标|口碑与热度",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合烂番茄(口碑)与流媒体平台(热度)，一站式掌握欧美影视动态。",
-    version: "1.0.2",
+    version: "1.0.3", // 🚀 升级版本号：启用 sort_by 触发右上角下拉菜单，并修复二级联动
     requiredVersion: "0.0.1",
     site: "https://www.rottentomatoes.com",
 
@@ -15,7 +15,7 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    name: "source",
+                    name: "sort_by", // 👈 核心修复：改为 sort_by (原 source)
                     title: "选择榜单",
                     type: "enumeration",
                     value: "rt_movies_home",
@@ -38,7 +38,7 @@ WidgetMetadata = {
                     type: "enumeration",
                     value: "united-states",
                     belongTo: { 
-                        paramName: "source", 
+                        paramName: "sort_by", // 👈 核心修复：联动目标改为 sort_by
                         value: ["fp_netflix", "fp_hbo", "fp_disney", "fp_apple", "fp_amazon"] 
                     },
                     enumOptions: [
@@ -56,7 +56,7 @@ WidgetMetadata = {
                     type: "enumeration",
                     value: "tv",
                     belongTo: { 
-                        paramName: "source", 
+                        paramName: "sort_by", // 👈 核心修复：联动目标改为 sort_by
                         value: ["fp_netflix", "fp_hbo", "fp_disney", "fp_apple", "fp_amazon"] 
                     },
                     enumOptions: [
@@ -94,10 +94,12 @@ const RT_URLS = {
 // =========================================================================
 
 async function loadWesternTrends(params = {}) {
-    const { source, page = 1 } = params;
-    if (source.startsWith("rt_")) return await loadRottenTomatoes(source, page);
-    if (source.startsWith("fp_")) {
-        const platform = source.replace("fp_", ""); 
+    const sort_by = params.sort_by || "rt_movies_home"; // 👈 接收 sort_by
+    const page = params.page || 1;
+    
+    if (sort_by.startsWith("rt_")) return await loadRottenTomatoes(sort_by, page);
+    if (sort_by.startsWith("fp_")) {
+        const platform = sort_by.replace("fp_", ""); 
         return await loadFlixPatrol(platform, params.region, params.mediaType);
     }
 }
