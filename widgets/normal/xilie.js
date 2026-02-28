@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "影迷宝藏 | 系列与流派",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合【系列电影大满贯】与【趣味流派探索】，一键补番，探索未知。",
-    version: "1.0.4", // 小幅升级版本号
+    version: "1.0.5", // 🚀 升级版本号：优化【趣味流派探索】的右上角菜单显示
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -12,12 +12,11 @@ WidgetMetadata = {
 
     modules: [
         // ===========================================
-        // 模块 1: 系列电影大满贯 (IP合集)
+        // 模块 1: 系列电影大满贯 (IP合集) —— 保持原样，不加右上角菜单
         // ===========================================
         {
             title: "系列电影大满贯",
             functionName: "loadFranchise",
-            // --- 核心修复 1：改为 video 类型 ---
             type: "video", 
             cacheDuration: 3600,
             params: [
@@ -69,17 +68,17 @@ WidgetMetadata = {
         },
 
         // ===========================================
-        // 模块 2: 设定控 (特殊流派)
+        // 模块 2: 设定控 (特殊流派) —— 修改为右上角触发
         // ===========================================
         {
             title: "趣味流派探索",
             functionName: "loadNicheGenre",
-            // --- 核心修复 1：改为 video 类型 ---
             type: "video", 
             cacheDuration: 3600,
             params: [
                 {
-                    name: "themeId",
+                    // 👈 核心修复 1：将 themeId 改为 sort_by 触发右上角菜单
+                    name: "sort_by", 
                     title: "选择感兴趣的设定",
                     type: "enumeration",
                     value: "12190",
@@ -117,7 +116,6 @@ WidgetMetadata = {
                         { title: "最新上映", value: "primary_release_date.desc" }
                     ]
                 },
-                // --- 新增：给流派探索加上翻页，体验更好 ---
                 { name: "page", title: "页码", type: "page", startPage: 1 }
             ]
         }
@@ -141,7 +139,6 @@ function getGenreText(ids) {
     return ids.map(id => GENRE_MAP[id]).filter(Boolean).slice(0, 3).join(" / ");
 }
 
-// --- 核心修复 2：统一格式化函数，适配 video 类型的横竖版排版 ---
 function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, genreText }) {
     return {
         id: String(id),
@@ -150,13 +147,8 @@ function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, ge
         mediaType: type,
         title: title,
         
-        // 横版：只保留类型，不要手动加年份，内核会自动拼
         genreTitle: genreText || (type === "tv" ? "剧集" : "电影"), 
-        
-        // 竖版：副标题显示具体日期 (YYYY-MM-DD) 和评分
         description: date ? `${date} · ⭐ ${rating}` : `⭐ ${rating}`, 
-        
-        // 给横版提取年份用的完整日期
         releaseDate: date,
         
         posterPath: poster ? `https://image.tmdb.org/t/p/w500${poster}` : "",
@@ -175,7 +167,6 @@ async function loadFranchise(params = {}) {
     let collectionId = presetId;
     let collectionName = "";
 
-    // 1. 自定义搜索
     if (presetId === "custom") {
         if (!customQuery) return [{ id: "err_no_q", type: "text", title: "请输入搜索词" }];
         
@@ -186,14 +177,12 @@ async function loadFranchise(params = {}) {
         collectionName = searchResult.name;
     }
 
-    // 2. 获取合集 (免 Key)
     try {
         const res = await Widget.tmdb.get(`/collection/${collectionId}`, { params: { language: "zh-CN" } });
         const data = res || {};
 
         if (!data.parts || data.parts.length === 0) return [{ id: "err_empty", type: "text", title: "合集数据为空" }];
 
-        // 3. 排序
         let movies = data.parts;
         movies.sort((a, b) => {
             if (sortOrder === "rating") return b.vote_average - a.vote_average;
@@ -202,7 +191,6 @@ async function loadFranchise(params = {}) {
             return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
         });
         
-        // 4. 格式化
         return movies.map((item, index) => {
             const date = item.release_date || "";
             const rank = index + 1;
@@ -212,7 +200,7 @@ async function loadFranchise(params = {}) {
                 id: item.id, 
                 tmdbId: item.id, 
                 type: "movie",
-                title: `${rank}. ${item.title}`, // 保留系列观看顺序编号
+                title: `${rank}. ${item.title}`,
                 date: date,
                 poster: item.poster_path,
                 backdrop: item.backdrop_path,
@@ -231,20 +219,21 @@ async function loadFranchise(params = {}) {
 // =========================================================================
 
 async function loadNicheGenre(params = {}) {
-    const { themeId, mediaType = "movie", sort = "popularity.desc", page = 1 } = params;
+    // 👈 核心修复 2：接管 sort_by 变回 themeId 的用途
+    const themeId = params.sort_by || "12190"; 
+    const { mediaType = "movie", sort = "popularity.desc", page = 1 } = params;
 
     const queryParams = {
         language: "zh-CN",
         sort_by: sort,
         include_adult: false,
         include_video: false,
-        page: page, // 添加了翻页支持
-        with_keywords: themeId,
+        page: page,
+        with_keywords: themeId, // 使用接管到的 themeId
         "vote_count.gte": 50
     };
 
     if (sort === "vote_average.desc") queryParams["vote_count.gte"] = 300;
-    // 修正排序字段
     if (mediaType === "tv" && sort.includes("primary_release_date")) queryParams.sort_by = "first_air_date.desc";
 
     try {
@@ -254,7 +243,6 @@ async function loadNicheGenre(params = {}) {
         if (!data.results || data.results.length === 0) return [{ id: "empty", type: "text", title: "暂无数据" }];
 
         return data.results.map(item => {
-            // 兼容电影和剧集的日期字段
             const date = item.first_air_date || item.release_date || "";
             const genreText = getGenreText(item.genre_ids);
             
