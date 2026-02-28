@@ -9,14 +9,14 @@ WidgetMetadata = {
     title: "全球影视专区",
     description: "自由切换全球十几个国家与地区，探索纯正的本土电影与剧集",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "2.1.0", // 🚀 修复：更换为 video 类型并使用 posterPath，完美适配二级页面自适应排版
+    version: "2.1.1", // 🚀 修复：精准绑定 sort_by 触发右上角下拉菜单
     requiredVersion: "0.0.1",
     modules: [
         // ================= 模块 1：全球探索发现 =================
         {
             title: "🌍 全球探索发现",
             functionName: "loadGlobalList",
-            type: "video", 
+            type: "video", // 保留你需要的自适应排版
             cacheDuration: 3600,
             params: [
                 {
@@ -52,7 +52,8 @@ WidgetMetadata = {
                     ]
                 },
                 {
-                    name: "category",
+                    // 👉 关键修复：改为 sort_by
+                    name: "sort_by",
                     title: "排序榜单",
                     type: "enumeration",
                     value: "hot",
@@ -69,7 +70,7 @@ WidgetMetadata = {
         {
             title: "🏷️ 高级类型榜单",
             functionName: "loadGenreRank",
-            type: "video", 
+            type: "video", // 保留你需要的自适应排版
             cacheDuration: 3600,
             params: [
                 {
@@ -131,7 +132,8 @@ WidgetMetadata = {
                     ]
                 },
                 {
-                    name: "sortBy",
+                    // 👉 关键修复：改为 sort_by
+                    name: "sort_by",
                     title: "排序规则",
                     type: "enumeration",
                     value: "popularity",
@@ -182,7 +184,7 @@ function buildItem(item, forceMediaType) {
         title: title,
         releaseDate: releaseDate, 
         genreTitle: genreText,    
-        subTitle: "",             
+        subTitle: "",            
         posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "", 
         backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "", 
         description: `${typeTag} | ⭐ ${score}\n${item.overview || "暂无简介"}`,
@@ -192,7 +194,7 @@ function buildItem(item, forceMediaType) {
     };
 }
 
-async function fetchFromTmdb(endpoint, category, page, regionKey) {
+async function fetchFromTmdb(endpoint, sort_by, page, regionKey) { // 👉 改为 sort_by
     const today = new Date().toISOString().split('T')[0];
     
     let queryParams = {
@@ -210,11 +212,11 @@ async function fetchFromTmdb(endpoint, category, page, regionKey) {
 
     const isMovie = endpoint.includes("movie");
 
-    if (category === "hot") {
+    if (sort_by === "hot") { // 👉 改为 sort_by
         queryParams.sort_by = "popularity.desc";
         queryParams["vote_count.gte"] = 5; 
     } 
-    else if (category === "new") {
+    else if (sort_by === "new") { // 👉 改为 sort_by
         queryParams.sort_by = isMovie ? "primary_release_date.desc" : "first_air_date.desc";
         if (isMovie) {
             queryParams["primary_release_date.lte"] = today;
@@ -223,7 +225,7 @@ async function fetchFromTmdb(endpoint, category, page, regionKey) {
         }
         queryParams["vote_count.gte"] = 1;
     } 
-    else if (category === "top") {
+    else if (sort_by === "top") { // 👉 改为 sort_by
         queryParams.sort_by = "vote_average.desc";
         queryParams["vote_count.gte"] = isMovie ? 50 : 20; 
     }
@@ -236,8 +238,7 @@ async function fetchFromTmdb(endpoint, category, page, regionKey) {
 async function loadGlobalList(params) {
     const region = params.region || "CN";
     const mediaType = params.mediaType || "all";
-    const category = params.category || "hot";
-    // ✨ 修复：加入了 parseInt 防止传字符串导致分页不触发
+    const sort_by = params.sort_by || "hot"; // 👉 改为 sort_by
     const page = parseInt(params.page) || 1;
 
     try {
@@ -245,18 +246,18 @@ async function loadGlobalList(params) {
 
         if (mediaType === "all") {
             const [movies, tvs] = await Promise.all([
-                fetchFromTmdb("/discover/movie", category, page, region),
-                fetchFromTmdb("/discover/tv", category, page, region)
+                fetchFromTmdb("/discover/movie", sort_by, page, region),
+                fetchFromTmdb("/discover/tv", sort_by, page, region)
             ]);
             
             items = [...movies, ...tvs];
 
             items.sort((a, b) => {
-                if (category === "hot") {
+                if (sort_by === "hot") { // 👉 改为 sort_by
                     return b._popularity - a._popularity; 
-                } else if (category === "new") {
+                } else if (sort_by === "new") { // 👉 改为 sort_by
                     return new Date(b._date) - new Date(a._date); 
-                } else if (category === "top") {
+                } else if (sort_by === "top") { // 👉 改为 sort_by
                     return b.rating - a.rating; 
                 }
                 return 0;
@@ -266,7 +267,7 @@ async function loadGlobalList(params) {
 
         } else {
             const endpoint = mediaType === "movie" ? "/discover/movie" : "/discover/tv";
-            items = await fetchFromTmdb(endpoint, category, page, region);
+            items = await fetchFromTmdb(endpoint, sort_by, page, region);
         }
 
         if (items.length === 0) {
@@ -327,15 +328,16 @@ async function loadGenreRank(params = {}) {
     const page = parseInt(params.page) || 1;
     console.log(`[GenreHub] 正在请求高级类型榜单 第 ${page} 页...`);
 
-    const { mediaType = "movie", genre = "scifi", region = "all", sortBy = "popularity" } = params;
+    // 👉 关键修复：改为 sort_by = "popularity"
+    const { mediaType = "movie", genre = "scifi", region = "all", sort_by = "popularity" } = params;
 
     const genreId = ADVANCED_GENRE_MAP[genre] ? ADVANCED_GENRE_MAP[genre][mediaType] : "";
     const originCountry = REGION_MAP[region] || "";
 
     let tmdbSortBy = "popularity.desc";
-    if (sortBy === "rating") {
+    if (sort_by === "rating") { // 👉 改为 sort_by
         tmdbSortBy = "vote_average.desc";
-    } else if (sortBy === "time") {
+    } else if (sort_by === "time") { // 👉 改为 sort_by
         tmdbSortBy = mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc";
     }
 
@@ -350,13 +352,13 @@ async function loadGenreRank(params = {}) {
     if (genreId) queryParams.with_genres = genreId;
     if (originCountry) queryParams.with_origin_country = originCountry;
 
-    if (sortBy === "rating") {
+    if (sort_by === "rating") { // 👉 改为 sort_by
         queryParams["vote_count.gte"] = 200; 
     } else {
         queryParams["vote_count.gte"] = 10; 
     }
 
-    if (sortBy === "time") {
+    if (sort_by === "time") { // 👉 改为 sort_by
         const today = new Date();
         today.setMonth(today.getMonth() + 1);
         const maxDate = today.toISOString().split('T')[0];
