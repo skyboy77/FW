@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "流媒体·独家原创",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "发现Netflix/HBO/腾讯/B站等平台自制内容",
-    version: "1.0.5", // 升级了版本号
+    version: "1.0.6", // 🚀 升级版本号：将平台选择移至右上角下拉菜单
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
 
@@ -17,7 +17,8 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    name: "network",
+                    // 👈 核心修改：将 network 改为 sort_by 以触发右上角下拉菜单
+                    name: "sort_by",
                     title: "出品平台",
                     type: "enumeration",
                     value: "213",
@@ -82,7 +83,9 @@ const GENRE_MAP = {
 };
 
 async function loadPlatformOriginals(params = {}) {
-    const { network = "213", genre = "", sortBy = "popularity.desc" } = params;
+    // 👈 逻辑接管：从 sort_by 中提取平台 network ID
+    const network = params.sort_by || "213";
+    const { genre = "", sortBy = "popularity.desc" } = params;
     // 获取分页参数，默认为 1
     const page = params.page || 1;
 
@@ -91,7 +94,7 @@ async function loadPlatformOriginals(params = {}) {
         include_adult: false,
         include_null_first_air_dates: false,
         page: page, // 传入动态页码
-        with_networks: network,
+        with_networks: network, // 使用接管的平台ID
         sort_by: sortBy
     };
 
