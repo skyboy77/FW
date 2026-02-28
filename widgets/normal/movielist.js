@@ -3,61 +3,72 @@ WidgetMetadata = {
     title: "全能电影榜",
     description: "提供流行、高分、年度最佳以及按类型探索电影",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.3.1", // 🚀 升级版本号：启用 sort_by 触发右上角菜单，并修复二级联动
+    version: "1.4.0", // 🚀 升级版本：拆分为三个独立模块，每个模块独占右上角下拉菜单
     requiredVersion: "0.0.1",
     modules: [
+        // ================= 模块 1：电影综合榜 =================
         {
-            title: "电影榜单",
-            functionName: "loadMovieList",
-            // --- 核心修正 1：改用 video 类型以获得更好的影视元数据排版支持 ---
+            title: "电影综合榜",
+            functionName: "loadGeneralMovies", // 对应新函数
             type: "video", 
             cacheDuration: 3600,
             params: [
-                // --- 一级菜单：主分类 ---
                 {
-                    name: "sort_by", // 👈 统一改为 sort_by (原 category)
+                    name: "sort_by", 
                     title: "榜单分类",
                     type: "enumeration",
-                    value: "popular", // 默认显示流行榜
+                    value: "popular", 
                     enumOptions: [
                         { title: "🔥 流行趋势 (Popular)", value: "popular" },
                         { title: "⭐️ 历史高分 (Top Rated)", value: "top_rated" },
                         { title: "💰 全球票房榜 (Box Office)", value: "box_office" },
-                        { title: "🏆 奥斯卡佳片 (Oscar)", value: "oscar" },
-                        { title: "🎬 年度最佳电影", value: "best_of_years" },
-                        { title: "🏷️ 按类型探索", value: "by_genre" }
+                        { title: "🏆 奥斯卡佳片 (Oscar)", value: "oscar" }
                     ]
                 },
-                // --- 二级菜单 A：年份选择 (仅在选中“年度最佳”时出现) ---
+                { name: "page", title: "页码", type: "page", startPage: 1 }
+            ]
+        },
+        // ================= 模块 2：年度最佳电影 =================
+        {
+            title: "年度最佳电影",
+            functionName: "loadYearlyBestMovies", // 对应新函数
+            type: "video", 
+            cacheDuration: 3600,
+            params: [
                 {
-                    name: "year",
+                    name: "sort_by", 
                     title: "选择年份",
                     type: "enumeration",
                     value: "2024",
-                    // 👈 同步修改联动目标为 sort_by
-                    belongTo: { paramName: "sort_by", value: ["best_of_years"] },
                     enumOptions: [
-                        { title: "2025", value: "2025" },
-                        { title: "2024", value: "2024" },
-                        { title: "2023", value: "2023" },
-                        { title: "2022", value: "2022" },
-                        { title: "2021", value: "2021" },
-                        { title: "2020", value: "2020" },
-                        { title: "2019", value: "2019" },
-                        { title: "2018", value: "2018" },
-                        { title: "2017", value: "2017" },
-                        { title: "2016", value: "2016" },
-                        { title: "2015", value: "2015" }
+                        { title: "2025年 最佳", value: "2025" },
+                        { title: "2024年 最佳", value: "2024" },
+                        { title: "2023年 最佳", value: "2023" },
+                        { title: "2022年 最佳", value: "2022" },
+                        { title: "2021年 最佳", value: "2021" },
+                        { title: "2020年 最佳", value: "2020" },
+                        { title: "2019年 最佳", value: "2019" },
+                        { title: "2018年 最佳", value: "2018" },
+                        { title: "2017年 最佳", value: "2017" },
+                        { title: "2016年 最佳", value: "2016" },
+                        { title: "2015年 最佳", value: "2015" }
                     ]
                 },
-                // --- 二级菜单 B：类型选择 (仅在选中“按类型探索”时出现) ---
+                { name: "page", title: "页码", type: "page", startPage: 1 }
+            ]
+        },
+        // ================= 模块 3：按类型探索 =================
+        {
+            title: "按类型探索",
+            functionName: "loadGenreMovies", // 对应新函数
+            type: "video", 
+            cacheDuration: 3600,
+            params: [
                 {
-                    name: "genre",
+                    name: "sort_by", 
                     title: "选择类型",
                     type: "enumeration",
-                    value: "878", // 默认科幻
-                    // 👈 同步修改联动目标为 sort_by
-                    belongTo: { paramName: "sort_by", value: ["by_genre"] },
+                    value: "878", 
                     enumOptions: [
                         { title: "🛸 科幻 (Sci-Fi)", value: "878" },
                         { title: "🎭 剧情 (Drama)", value: "18" },
@@ -71,14 +82,13 @@ WidgetMetadata = {
                         { title: "🦄 动画 (Animation)", value: "16" }
                     ]
                 },
-                // --- 翻页组件 ---
                 { name: "page", title: "页码", type: "page", startPage: 1 }
             ]
         }
     ]
 };
 
-// ================= 逻辑处理部分 =================
+// ================= 核心工具函数 =================
 
 const GENRE_MAP = {
     28: "动作", 12: "冒险", 16: "动画", 35: "喜剧", 80: "犯罪", 99: "纪录片",
@@ -93,7 +103,6 @@ function getGenreText(ids) {
     return genres.length > 0 ? genres.slice(0, 2).join(" / ") : "电影";
 }
 
-// --- 核心修正 2：完全对齐参考代码的字段结构 ---
 function buildItem(item) {
     if (!item) return null;
     
@@ -107,37 +116,26 @@ function buildItem(item) {
         type: "tmdb",
         mediaType: "movie",
         title: item.title,
-        
-        // 修正 A：只留类型标签，不要手动加年份。Forward 会在横版时自动把年份加上。
         genreTitle: genreText,
-        
-        // 修正 B：竖版海报下方读取的是 description，我们把日期和评分放这里
         description: releaseDate ? `${releaseDate} · ⭐ ${score}` : `⭐ ${score}`,
-        
-        // 修正 C：传给内核的日期字段，内核会自动提取年份给横版 UI
         releaseDate: releaseDate,
-        
-        // 修正 D：使用与参考代码一致的图片字段名
         posterPath: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "",
         backdropPath: item.backdrop_path ? `https://image.tmdb.org/t/p/w780${item.backdrop_path}` : "",
-        
         rating: parseFloat(score)
     };
 }
 
-// 主请求函数
-async function loadMovieList(params) {
-    const sort_by = params.sort_by || "popular"; // 👈 接收 sort_by
-    const page = params.page || 1;
+// ================= 逻辑处理部分 (拆分为3个独立函数) =================
 
+// 1. 处理【电影综合榜】
+async function loadGeneralMovies(params) {
+    const sort_by = params.sort_by || "popular"; 
+    const page = params.page || 1;
     try {
         let endpoint = "";
-        let queryParams = { 
-            language: "zh-CN", 
-            page: page 
-        };
+        let queryParams = { language: "zh-CN", page: page };
 
-        if (sort_by === "popular") { // 👈 全部替换为 sort_by
+        if (sort_by === "popular") {
             endpoint = "/movie/popular";
         } else if (sort_by === "top_rated") {
             endpoint = "/movie/top_rated";
@@ -149,31 +147,51 @@ async function loadMovieList(params) {
             queryParams.with_keywords = "818";
             queryParams.sort_by = "vote_average.desc";
             queryParams["vote_count.gte"] = 1000;
-        } else if (sort_by === "best_of_years") {
-            const targetYear = params.year || "2024";
-            endpoint = "/discover/movie";
-            queryParams.primary_release_year = targetYear;
-            queryParams.sort_by = "vote_average.desc";
-            queryParams["vote_count.gte"] = 500; 
-        } else if (sort_by === "by_genre") {
-            const targetGenre = params.genre || "878";
-            endpoint = "/discover/movie";
-            queryParams.with_genres = targetGenre;
-            queryParams.sort_by = "popularity.desc"; 
         }
 
         const res = await Widget.tmdb.get(endpoint, { params: queryParams });
-        
-        const items = (res.results || []).map(i => buildItem(i)).filter(Boolean);
-        return items;
+        return (res.results || []).map(i => buildItem(i)).filter(Boolean);
+    } catch (error) { return handleError(); }
+}
 
-    } catch (error) {
-        console.error("数据请求异常:", error);
-        return [{
-            id: "error",
-            type: "text",
-            title: "加载异常",
-            description: "网络开小差了，请下拉刷新重试"
-        }];
-    }
+// 2. 处理【年度最佳电影】
+async function loadYearlyBestMovies(params) {
+    // 这里的 sort_by 接收到的是年份 (如 "2024")
+    const targetYear = params.sort_by || "2024"; 
+    const page = params.page || 1;
+    try {
+        let queryParams = { 
+            language: "zh-CN", 
+            page: page,
+            primary_release_year: targetYear,
+            sort_by: "vote_average.desc",
+            "vote_count.gte": 500 
+        };
+        const res = await Widget.tmdb.get("/discover/movie", { params: queryParams });
+        return (res.results || []).map(i => buildItem(i)).filter(Boolean);
+    } catch (error) { return handleError(); }
+}
+
+// 3. 处理【按类型探索】
+async function loadGenreMovies(params) {
+    // 这里的 sort_by 接收到的是类型ID (如 "878")
+    const targetGenre = params.sort_by || "878"; 
+    const page = params.page || 1;
+    try {
+        let queryParams = { 
+            language: "zh-CN", 
+            page: page,
+            with_genres: targetGenre,
+            sort_by: "popularity.desc"
+        };
+        const res = await Widget.tmdb.get("/discover/movie", { params: queryParams });
+        return (res.results || []).map(i => buildItem(i)).filter(Boolean);
+    } catch (error) { return handleError(); }
+}
+
+// 错误处理小工具
+function handleError() {
+    return [{
+        id: "error", type: "text", title: "加载异常", description: "网络开小差了，请下拉刷新重试"
+    }];
 }
