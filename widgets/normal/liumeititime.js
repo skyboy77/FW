@@ -2,8 +2,8 @@ WidgetMetadata = {
   id: "makka.platform.originals",
   title: "流媒体·独家原创Pro（更新时间版）",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-  description: "各平台独播剧",
-  version: "1.0.9", // 修复 Forward 年份重复拼接问题
+  description: "各平台独播剧，支持右上角快捷切换出品平台。",
+  version: "1.1.0", // 🚀 升级版本号：加入右上角平台切换菜单
   requiredVersion: "0.0.1",
   modules: [
     {
@@ -12,9 +12,9 @@ WidgetMetadata = {
       type: "video", // 可随意改为 list 横版
       requiresWebView: false,
       params: [
-        // 1. 平台选择
+        // 1. 平台选择 (已修改为右上角触发)
         {
-          name: "network",
+          name: "sort_by", // 👈 核心修改：将 network 改为 sort_by 触发右上角菜单
           title: "出品平台",
           type: "enumeration",
           value: "213",
@@ -50,7 +50,7 @@ WidgetMetadata = {
         },
         // 3. 排序与功能
         {
-          name: "sortBy",
+          name: "sortBy", // 这里保持 camelCase，不会与上面的 sort_by 冲突
           title: "排序与功能",
           type: "enumeration",
           value: "popularity.desc",
@@ -106,7 +106,8 @@ function getGenreName(ids) {
 // ==========================================
 
 async function loadPlatformOriginals(params) {
-  const networkId = params.network || "213";
+  // 👈 逻辑接管：从 sort_by 获取出品平台 ID
+  const networkId = params.sort_by || "213";
   const contentType = params.contentType || "tv";
   const sortBy = params.sortBy || "popularity.desc";
   const page = params.page || 1;
