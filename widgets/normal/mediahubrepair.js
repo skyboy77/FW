@@ -8,7 +8,7 @@ WidgetMetadata = {
     title: "全球影视 | 分流聚合（防风控版）",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "防风控版本，提供给这个模块的普通版有问题的人使用。",
-    version: "1.3.6", // 🚀 真正修复版：精准使用 sort_by 唤醒右上角菜单！
+    version: "1.3.5", // 升级版本号：加入豆瓣终极防风控策略
     requiredVersion: "0.0.1",
     site: "https://www.themoviedb.org",
     
@@ -31,8 +31,7 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    // 👈 核心修复：将 source 改为 sort_by 触发右上角菜单
-                    name: "sort_by", 
+                    name: "source",
                     title: "选择榜单",
                     type: "enumeration",
                     value: "trakt_trending",
@@ -54,8 +53,7 @@ WidgetMetadata = {
                     title: "Trakt 类型",
                     type: "enumeration",
                     value: "all", 
-                    // 👈 同步修改联动依赖
-                    belongTo: { paramName: "sort_by", value: ["trakt_trending", "trakt_popular", "trakt_anticipated"] },
+                    belongTo: { paramName: "source", value: ["trakt_trending", "trakt_popular", "trakt_anticipated"] },
                     enumOptions: [
                         { title: "全部 (剧集+电影)", value: "all" }, 
                         { title: "剧集", value: "shows" },
@@ -72,8 +70,7 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    // 👈 核心修复：将 platformId 改为 sort_by 触发右上角菜单
-                    name: "sort_by", 
+                    name: "platformId",
                     title: "播出平台",
                     type: "enumeration",
                     value: "2007",
@@ -168,9 +165,7 @@ function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, ge
 // =========================================================================
 
 async function loadTrendHub(params = {}) {
-    // 👈 逻辑接管：从 sort_by 中提取榜单源
-    const source = params.sort_by || "trakt_trending";
-    const { traktType = "all" } = params;
+    const { source, traktType = "all" } = params;
     const page = params.page || 1; 
     const traktClientId = params.traktClientId || DEFAULT_TRAKT_ID;
 
@@ -245,9 +240,7 @@ async function loadTrendHub(params = {}) {
 }
 
 async function loadPlatformMatrix(params = {}) {
-    // 👈 逻辑接管：从 sort_by 中提取播出平台 ID
-    const platformId = params.sort_by || "2007";
-    const { category = "tv_drama", sort = "popularity.desc" } = params;
+    const { platformId, category = "tv_drama", sort = "popularity.desc" } = params;
     const page = params.page || 1;
 
     const foreignPlatforms = ["213", "2739", "49", "2552"];
@@ -330,4 +323,178 @@ async function fetchTmdbDetail(id, type, stats, title) {
             subTitle: stats,
             desc: d.overview // 传入简介
         });
-    } catch (e
+    } catch (e) { return null; }
+}
+
+async function searchTmdb(query, type) {
+    const q = query.replace(/第[一二三四五六七八九十\d]+[季章]/g, "").trim();
+    try {
+        const res = await Widget.tmdb.get(`/search/${type}`, { 
+            params: { query: encodeURIComponent(q), language: "zh-CN" } 
+        });
+        return (res.results || [])[0];
+    } catch (e) { return null; }
+}
+
+// --- 更新：支持混合平台数据的排版融合 ---
+function mergeTmdb(target, source) {
+    target.id = String(source.id);
+    target.tmdbId = source.id;
+    target.posterPath = source.poster_path ? `https://image.tmdb.org/t/p/w500${source.poster_path}` : target.posterPath;
+    target.backdropPath = source.backdrop_path ? `https://image.tmdb.org/t/p/w780${source.backdrop_path}` : "";
+    
+    const date = source.first_air_date || source.release_date || "";
+    const genreText = getGenreText(source.genre_ids);
+    
+    target.genreTitle = genreText || (target.mediaType === "tv" ? "剧集" : "电影");
+    target.releaseDate = date;
+    
+    // 合并数据时，把 TMDB 查到的 overview 剧情拼接到末尾
+    const baseInfo = date ? `${date} · ${target.subTitle}` : target.subTitle;
+    const overview = source.overview ? `\n${source.overview}` : "\n暂无简介";
+    target.description = baseInfo + overview;
+    
+    target.rating = source.vote_average ? parseFloat(source.vote_average) : 0;
+}
+
+// =========================================================================
+// 第三方源 (防风控策略加强版)
+// =========================================================================
+
+async function fetchTraktData(type, list, id, page) {
+    try {
+        const res = await Widget.http.get(`https://api.trakt.tv/${type}/${list}?limit=15&page=${page}`, {
+            headers: { "Content-Type": "application/json", "trakt-api-version": "2", "trakt-api-key": id }
+        });
+        return res.data || [];
+    } catch (e) { return []; }
+}
+
+async function fetchDoubanAndMap(tag, type, page) {
+    const start = (page - 1) * 20;
+    try {
+        // 💡 终极修复：伪造一个随机的豆瓣访客 Cookie (bid)，这是突破部分风控的关键
+        const randomBid = Math.random().toString(36).substring(2, 13);
+        
+        const res = await Widget.http.get(`https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(tag)}&sort=recommend&page_limit=20&page_start=${start}`, {
+            headers: { 
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+                "Referer": "https://movie.douban.com/explore", // 模拟从发现页点击进入
+                "Host": "movie.douban.com",
+                // 💡 告诉豆瓣：我是通过网页里的 AJAX 正常请求的，不是爬虫工具
+                "X-Requested-With": "XMLHttpRequest", 
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Connection": "keep-alive",
+                // 💡 携带随机生成的 Cookie，骗过基础的身份校验
+                "Cookie": `bid=${randomBid};`
+            }
+        });
+
+        // 豆瓣有时即使不报错，也会因为风控返回乱码或空数据，这里做个安全解析判断
+        const data = (typeof res.data === 'string') ? JSON.parse(res.data) : (res.data || {});
+        const list = data.subjects || [];
+        
+        if (list.length === 0) return page === 1 ? [{ id: "empty", type: "text", title: "暂无数据" }] : [];
+        
+        const promises = list.map(async (item, i) => {
+            let finalItem = { 
+                id: `db_${item.id}`, type: "tmdb", mediaType: type, 
+                title: item.title, // 去掉前面的数字序号
+                subTitle: `豆瓣🫛 ${item.rate}`, 
+                description: `豆瓣 ${item.rate}\n暂无简介`, // 预设简介格式
+                genreTitle: type === "tv" ? "剧集" : "电影",
+                posterPath: item.cover 
+            };
+            const tmdb = await searchTmdb(item.title, type);
+            if (tmdb) mergeTmdb(finalItem, tmdb); 
+            return finalItem;
+        });
+        return await Promise.all(promises);
+        
+    } catch (e) { 
+        console.error("豆瓣风控拦截或网络异常:", e);
+        return [{ 
+            id: "err", 
+            type: "text", 
+            title: "豆瓣拒绝了请求", 
+            description: "对方所在的网络IP被豆瓣限制。请尝试切换手机流量(4G/5G)或重启路由器换个IP再试。" 
+        }]; 
+    }
+}
+
+async function fetchBilibiliRank(type, page) {
+    try {
+        const res = await Widget.http.get(`https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=${type}`);
+        const allList = (res.data?.result?.list || res.data?.data?.list || []);
+        
+        const pageSize = 15;
+        const start = (page - 1) * pageSize;
+        const end = start + pageSize;
+        
+        if (start >= allList.length) return [];
+        const list = allList.slice(start, end);
+        
+        const promises = list.map(async (item, i) => {
+            const rank = start + i + 1;
+            let finalItem = { 
+                id: `bili_${rank}`, type: "tmdb", mediaType: "tv", 
+                title: item.title, // 去掉了数字序号
+                subTitle: item.new_ep?.index_show || "热播中", 
+                description: `${item.new_ep?.index_show || "热播中"}\n暂无简介`, // 加入 description 占位
+                genreTitle: "剧集",
+                posterPath: item.cover 
+            };
+            const tmdb = await searchTmdb(item.title, "tv");
+            if (tmdb) mergeTmdb(finalItem, tmdb);
+            return finalItem;
+        });
+        return await Promise.all(promises);
+    } catch (e) { return [{ id: "err", type: "text", title: "B站连接失败" }]; }
+}
+
+async function fetchBangumiDaily() {
+    try {
+        const res = await Widget.http.get("https://api.bgm.tv/calendar");
+        const data = res.data || [];
+        const dayId = (new Date().getDay() || 7);
+        const items = data.find(d => d.weekday.id === dayId)?.items || [];
+        
+        const promises = items.map(async item => {
+            const name = item.name_cn || item.name;
+            let finalItem = { 
+                id: `bgm_${item.id}`, type: "tmdb", mediaType: "tv", 
+                title: name, 
+                subTitle: item.name, 
+                description: `${item.name}\n暂无简介`, // 加入 description 占位
+                genreTitle: "剧集",
+                posterPath: item.images?.large 
+            };
+            const tmdb = await searchTmdb(name, "tv");
+            if (tmdb) mergeTmdb(finalItem, tmdb);
+            return finalItem;
+        });
+        return await Promise.all(promises);
+    } catch (e) { return []; }
+}
+
+async function fetchTmdbFallback(traktType) {
+    const type = traktType === "shows" ? "tv" : "movie";
+    try {
+        const r = await Widget.tmdb.get(`/trending/${type}/day`, { params: { language: "zh-CN" } });
+        return (r.results || []).slice(0, 15).map(item => {
+            const date = item.first_air_date || item.release_date || "";
+            const genreText = getGenreText(item.genre_ids);
+            return buildItem({
+                id: item.id, tmdbId: item.id, type: type,
+                title: item.name || item.title,
+                date: date,
+                genreText: genreText,
+                poster: item.poster_path,
+                subTitle: "TMDB Trending",
+                rating: item.vote_average?.toFixed(1),
+                desc: item.overview // 补上简介
+            });
+        });
+    } catch(e) { return []; }
+}
