@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "二次元全境聚合",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "一站式聚合多平台动漫榜单。",
-    version: "2.2.4",
+    version: "2.2.5", // 🚀 升级版本号：全面适配 sort_by 下拉菜单
     requiredVersion: "0.0.1",
     site: "https://bgm.tv",
 
@@ -11,11 +11,11 @@ WidgetMetadata = {
         {
             title: "Bilibili 热榜",
             functionName: "loadBilibiliRank",
-            type: "video", // 建议使用 video 类型以获得更好元数据支持
+            type: "video", 
             cacheDuration: 1800,
             params: [
                 {
-                    name: "type",
+                    name: "sort_by", // 👈 统一改为 sort_by (原 type)
                     title: "榜单分区",
                     type: "enumeration",
                     value: "1",
@@ -34,7 +34,7 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    name: "weekday",
+                    name: "sort_by", // 👈 统一改为 sort_by (原 weekday)
                     title: "选择日期",
                     type: "enumeration",
                     value: "today",
@@ -59,7 +59,7 @@ WidgetMetadata = {
             cacheDuration: 3600,
             params: [
                 {
-                    name: "sort",
+                    name: "sort_by", // 👈 统一改为 sort_by (原 sort)
                     title: "榜单类型",
                     type: "enumeration",
                     value: "trending",
@@ -79,7 +79,7 @@ WidgetMetadata = {
             cacheDuration: 7200,
             params: [
                 {
-                    name: "sort",
+                    name: "sort_by", // 👈 统一改为 sort_by (原 sort)
                     title: "排序方式",
                     type: "enumeration",
                     value: "TRENDING_DESC",
@@ -99,7 +99,7 @@ WidgetMetadata = {
             cacheDuration: 7200,
             params: [
                 {
-                    name: "filter",
+                    name: "sort_by", // 👈 统一改为 sort_by (原 filter)
                     title: "榜单类型",
                     type: "enumeration",
                     value: "airing",
@@ -163,12 +163,12 @@ function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, ge
 }
 
 // =========================================================================
-// 1. 各模块函数逻辑 (已适配 buildItem 参数)
+// 1. 各模块函数逻辑 (已适配 sort_by)
 // =========================================================================
 
 async function loadBilibiliRank(params = {}) {
-    const { type = "1", page = 1 } = params;
-    const url = `https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=${type}`;
+    const { sort_by = "1", page = 1 } = params; // 👈 接收 sort_by
+    const url = `https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=${sort_by}`; // 👈 替换
     try {
         const res = await Widget.http.get(url, {
             headers: { "User-Agent": "Mozilla/5.0", "Referer": "https://www.bilibili.com/" }
@@ -188,7 +188,7 @@ async function loadBilibiliRank(params = {}) {
                 tmdbId: tmdbItem.id,
                 type: "tv",
                 title: tmdbItem.name || tmdbItem.title,
-                date: tmdbItem.first_air_date, // 传具体日期
+                date: tmdbItem.first_air_date,
                 poster: tmdbItem.poster_path,
                 backdrop: tmdbItem.backdrop_path,
                 rating: tmdbItem.vote_average,
@@ -203,9 +203,9 @@ async function loadBilibiliRank(params = {}) {
 }
 
 async function loadBangumiCalendar(params = {}) {
-    const { weekday = "today", page = 1 } = params;
-    let targetDayId = parseInt(weekday);
-    if (weekday === "today") {
+    const { sort_by = "today", page = 1 } = params; // 👈 接收 sort_by
+    let targetDayId = parseInt(sort_by); // 👈 替换
+    if (sort_by === "today") { // 👈 替换
         const jsDay = new Date().getDay();
         targetDayId = jsDay === 0 ? 7 : jsDay;
     }
@@ -239,11 +239,12 @@ async function loadBangumiCalendar(params = {}) {
 }
 
 async function loadTmdbAnimeRanking(params = {}) {
-    const { sort = "trending", page = 1 } = params;
+    const { sort_by = "trending", page = 1 } = params; // 👈 接收 sort_by
     let queryParams = { language: "zh-CN", page: page, with_genres: "16", with_original_language: "ja" };
-    if (sort === "trending") queryParams.sort_by = "popularity.desc";
-    else if (sort === "new") queryParams.sort_by = "first_air_date.desc";
-    else if (sort === "top") queryParams.sort_by = "vote_average.desc";
+    
+    if (sort_by === "trending") queryParams.sort_by = "popularity.desc"; // 👈 替换
+    else if (sort_by === "new") queryParams.sort_by = "first_air_date.desc"; // 👈 替换
+    else if (sort_by === "top") queryParams.sort_by = "vote_average.desc"; // 👈 替换
 
     try {
         const res = await Widget.tmdb.get("/discover/tv", { params: queryParams });
@@ -263,8 +264,8 @@ async function loadTmdbAnimeRanking(params = {}) {
 }
 
 async function loadAniListRanking(params = {}) {
-    const { sort = "TRENDING_DESC", page = 1 } = params;
-    const query = `query ($page: Int, $perPage: Int) { Page (page: $page, perPage: $perPage) { media (sort: ${sort}, type: ANIME) { title { native romaji english } averageScore seasonYear } } }`;
+    const { sort_by = "TRENDING_DESC", page = 1 } = params; // 👈 接收 sort_by
+    const query = `query ($page: Int, $perPage: Int) { Page (page: $page, perPage: $perPage) { media (sort: ${sort_by}, type: ANIME) { title { native romaji english } averageScore seasonYear } } }`; // 👈 替换为 sort_by
     try {
         const res = await Widget.http.post("https://graphql.anilist.co", { query, variables: { page, perPage: 20 } });
         const data = res.data?.data?.Page?.media || [];
@@ -290,10 +291,10 @@ async function loadAniListRanking(params = {}) {
 }
 
 async function loadMalRanking(params = {}) {
-    const { filter = "airing", page = 1 } = params;
+    const { sort_by = "airing", page = 1 } = params; // 👈 接收 sort_by
     let apiParams = { page: page };
-    if (filter === "airing") apiParams.filter = "airing";
-    else if (filter === "upcoming") apiParams.filter = "upcoming";
+    if (sort_by === "airing") apiParams.filter = "airing"; // 👈 替换
+    else if (sort_by === "upcoming") apiParams.filter = "upcoming"; // 👈 替换
 
     try {
         const res = await Widget.http.get("https://api.jikan.moe/v4/top/anime", { params: apiParams });
@@ -303,7 +304,7 @@ async function loadMalRanking(params = {}) {
             if (!tmdbItem) return null;
             return buildItem({
                 id: tmdbItem.id,
-                tmdbId: tmdbId,
+                tmdbId: tmdbItem.id, // 🛠️ 这里帮你修复了之前代码里的报错隐患！
                 type: "tv",
                 title: tmdbItem.name,
                 date: tmdbItem.first_air_date,
