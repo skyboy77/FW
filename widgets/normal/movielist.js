@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "全能电影榜",
     description: "提供流行、高分、年度最佳以及按类型探索电影",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.3.0", // 更新版本号
+    version: "1.3.1", // 🚀 升级版本号：启用 sort_by 触发右上角菜单，并修复二级联动
     requiredVersion: "0.0.1",
     modules: [
         {
@@ -15,7 +15,7 @@ WidgetMetadata = {
             params: [
                 // --- 一级菜单：主分类 ---
                 {
-                    name: "category",
+                    name: "sort_by", // 👈 统一改为 sort_by (原 category)
                     title: "榜单分类",
                     type: "enumeration",
                     value: "popular", // 默认显示流行榜
@@ -34,7 +34,8 @@ WidgetMetadata = {
                     title: "选择年份",
                     type: "enumeration",
                     value: "2024",
-                    belongTo: { paramName: "category", value: ["best_of_years"] },
+                    // 👈 同步修改联动目标为 sort_by
+                    belongTo: { paramName: "sort_by", value: ["best_of_years"] },
                     enumOptions: [
                         { title: "2025", value: "2025" },
                         { title: "2024", value: "2024" },
@@ -55,7 +56,8 @@ WidgetMetadata = {
                     title: "选择类型",
                     type: "enumeration",
                     value: "878", // 默认科幻
-                    belongTo: { paramName: "category", value: ["by_genre"] },
+                    // 👈 同步修改联动目标为 sort_by
+                    belongTo: { paramName: "sort_by", value: ["by_genre"] },
                     enumOptions: [
                         { title: "🛸 科幻 (Sci-Fi)", value: "878" },
                         { title: "🎭 剧情 (Drama)", value: "18" },
@@ -125,7 +127,7 @@ function buildItem(item) {
 
 // 主请求函数
 async function loadMovieList(params) {
-    const category = params.category || "popular";
+    const sort_by = params.sort_by || "popular"; // 👈 接收 sort_by
     const page = params.page || 1;
 
     try {
@@ -135,25 +137,25 @@ async function loadMovieList(params) {
             page: page 
         };
 
-        if (category === "popular") {
+        if (sort_by === "popular") { // 👈 全部替换为 sort_by
             endpoint = "/movie/popular";
-        } else if (category === "top_rated") {
+        } else if (sort_by === "top_rated") {
             endpoint = "/movie/top_rated";
-        } else if (category === "box_office") {
+        } else if (sort_by === "box_office") {
             endpoint = "/discover/movie";
             queryParams.sort_by = "revenue.desc";
-        } else if (category === "oscar") {
+        } else if (sort_by === "oscar") {
             endpoint = "/discover/movie";
             queryParams.with_keywords = "818";
             queryParams.sort_by = "vote_average.desc";
             queryParams["vote_count.gte"] = 1000;
-        } else if (category === "best_of_years") {
+        } else if (sort_by === "best_of_years") {
             const targetYear = params.year || "2024";
             endpoint = "/discover/movie";
             queryParams.primary_release_year = targetYear;
             queryParams.sort_by = "vote_average.desc";
             queryParams["vote_count.gte"] = 500; 
-        } else if (category === "by_genre") {
+        } else if (sort_by === "by_genre") {
             const targetGenre = params.genre || "878";
             endpoint = "/discover/movie";
             queryParams.with_genres = targetGenre;
