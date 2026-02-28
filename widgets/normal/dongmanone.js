@@ -23,11 +23,36 @@ var WidgetMetadata = {
     title: "二次元全境聚合",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "一站式聚合多平台动漫榜单 (纯享TMDB海报版)。",
-    version: "2.4.0", // 🚀 升级：宁缺毋滥！找不到TMDB数据的直接丢弃，不留空占位
+    version: "2.4.2", // 🚀 升级：找回经典“Bangumi追番日历”并接入严格TMDB映射
     requiredVersion: "0.0.1",
     site: "https://bgm.tv",
 
     modules: [
+        {
+            title: "Bangumi 追番日历",
+            functionName: "loadBangumiCalendar",
+            type: "video",
+            cacheDuration: 3600,
+            params: [
+                {
+                    name: "sort_by", 
+                    title: "选择日期",
+                    type: "enumeration",
+                    value: "today",
+                    enumOptions: [
+                        { title: "📅 今日更新", value: "today" },
+                        { title: "周一 (月)", value: "1" },
+                        { title: "周二 (火)", value: "2" },
+                        { title: "周三 (水)", value: "3" },
+                        { title: "周四 (木)", value: "4" },
+                        { title: "周五 (金)", value: "5" },
+                        { title: "周六 (土)", value: "6" },
+                        { title: "周日 (日)", value: "7" }
+                    ]
+                },
+                { name: "page", title: "页码", type: "page" }
+            ]
+        },
         {
             title: "Bilibili 热榜",
             functionName: "loadBilibiliRank",
@@ -82,7 +107,7 @@ var WidgetMetadata = {
             ]
         },
         {
-            title: "Bangumi 每日放送",
+            title: "Bangumi 每日放送 (高级筛选)",
             description: "查看指定范围的放送（数据来自Bangumi API）",
             requiresWebView: false,
             functionName: "fetchDailyCalendarApi",
@@ -331,10 +356,74 @@ function buildTmdbItem(item, forceType) {
     };
 }
 
+/** 原版UI标准组件生成器 */
+function buildItem({ id, tmdbId, type, title, date, poster, backdrop, rating, genreText, subTitle, desc }) {
+    return {
+        id: String(id),
+        tmdbId: parseInt(tmdbId),
+        type: "tmdb", 
+        mediaType: type || "tv",
+        title: title,
+        genreTitle: genreText || "动画", 
+        description: date || subTitle || "暂无日期", 
+        releaseDate: date,
+        posterPath: poster ? `https://image.tmdb.org/t/p/w500${poster}` : "",
+        backdropPath: backdrop ? `https://image.tmdb.org/t/p/w780${backdrop}` : "",
+        rating: rating ? Number(rating).toFixed(1) : "0.0"
+    };
+}
+
 
 // =========================================================================
 // API 爬取与映射函数
 // =========================================================================
+
+// --- 🌟 模块 0：直观的 Bangumi 追番日历 ---
+async function loadBangumiCalendar(params = {}) {
+    const { sort_by = "today", page = 1 } = params;
+    let targetDayId = parseInt(sort_by);
+    if (sort_by === "today") {
+        const jsDay = new Date().getDay();
+        targetDayId = jsDay === 0 ? 7 : jsDay;
+    }
+    
+    try {
+        const res = await Widget.http.get("https://api.bgm.tv/calendar");
+        const dayData = (res.data || []).find(d => d.weekday && d.weekday.id === targetDayId);
+        if (!dayData) return [];
+        
+        const pageSize = 20;
+        const pageItems = dayData.items.slice((page - 1) * pageSize, page * pageSize);
+
+        const promises = pageItems.map(async (item) => {
+            const cleanTitle = (item.name_cn || item.name).replace(/第[一二三四五六七八九十\d]+[季章]/g, "").trim();
+            const year = item.air_date ? item.air_date.substring(0, 4) : null;
+            
+            // 核心：严格 TMDB 动画匹配
+            const tmdbItem = await searchTmdbAnimeStrict(cleanTitle, item.name, year);
+            
+            // 🔪 宁缺毋滥：找不到 TMDB 数据直接丢弃
+            if (!tmdbItem) return null;
+
+            return buildItem({
+                id: tmdbItem.id,
+                tmdbId: tmdbItem.id,
+                type: "tv",
+                title: tmdbItem.name || tmdbItem.title || item.name_cn || item.name,
+                date: tmdbItem.first_air_date || item.air_date,
+                poster: tmdbItem.poster_path,
+                backdrop: tmdbItem.backdrop_path,
+                rating: tmdbItem.vote_average || item.rating?.score,
+                genreText: getGenreText(tmdbItem.genre_ids),
+                desc: tmdbItem.overview || item.summary || "暂无简介"
+            });
+        });
+        
+        const results = await Promise.all(promises);
+        return results.filter(Boolean);
+    } catch (e) { return []; }
+}
+
 
 async function fetchAndCacheGlobalData() {
     if (globalData) return globalData;
