@@ -1,8 +1,8 @@
 // =============UserScript=============
-// @name         影视聚合终极版 (内置Key)
-// @version      3.1.1
-// @description  三合一：豆瓣全能推荐 | TMDB探索 | Trakt猜你喜欢
-// @author       Forward_User & Fix
+// @name        影视聚合终极版 (内置Key)
+// @version     3.1.2
+// @description 三合一：豆瓣全能推荐 | TMDB探索 | Trakt猜你喜欢
+// @author      Forward_User & Fix
 // =============UserScript=============
 
 // 🔑 已内置您提供的 Key
@@ -44,7 +44,7 @@ var WidgetMetadata = {
     title: "影视榜单Lite",
     description: "豆瓣全能推荐 | TMDB探索 | 猜你想看",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
-    version: "1.1.0", // 升级版本号
+    version: "3.1.2", // 🚀 升级版本号：加入右上角快捷菜单
     requiredVersion: "0.0.1",
 
     // 🔴 移除了所有全局参数
@@ -60,7 +60,7 @@ var WidgetMetadata = {
             type: "video", // 统一为 video 体验更好
             params: [
                 {
-                    name: "category",
+                    name: "sort_by", // 👈 改为 sort_by 触发右上角菜单
                     title: "选择栏目",
                     type: "enumeration",
                     value: "tv_american",
@@ -98,7 +98,10 @@ var WidgetMetadata = {
             type: "video",
             params: [
                 {
-                    name: "mode", title: "模式", type: "enumeration", value: "movie",
+                    name: "sort_by", // 👈 将 mode 改为 sort_by 触发右上角菜单
+                    title: "模式", 
+                    type: "enumeration", 
+                    value: "movie",
                     enumOptions: [ { value: "movie", title: "🎬 电影筛选" }, { value: "tv", title: "📺 剧集筛选" } ]
                 },
                 {
@@ -113,7 +116,10 @@ var WidgetMetadata = {
                 },
                 { name: "year", title: "年份", type: "input", description: "例如: 2024", value: "" },
                 {
-                    name: "sort_by", title: "排序", type: "enumeration", value: "popularity.desc",
+                    name: "sortBy", // 👈 底层排序改为驼峰命名，让出右上角位置
+                    title: "排序", 
+                    type: "enumeration", 
+                    value: "popularity.desc",
                     enumOptions: [
                         { title: "🔥 热度最高", value: "popularity.desc" },
                         { title: "⭐️ 评分最高", value: "vote_average.desc" },
@@ -189,7 +195,8 @@ async function searchTmdb(title, year, apiKey, isTv) {
 }
 
 async function loadDoubanModule(params) {
-    var categoryKey = params.category;
+    // 👈 逻辑接管：从 sort_by 获取豆瓣栏目 ID
+    var categoryKey = params.sort_by || "tv_american";
     var url = DOUBAN_URLS[categoryKey];
     
     if (!url) return [{ title: "配置错误", subTitle: "未找到API", type: "text" }];
@@ -312,13 +319,16 @@ function buildTmdbItem(item, mediaType) {
 }
 
 async function loadTMDBModule(params) {
-    var mode = params.mode || "movie"; 
+    // 👈 逻辑接管：从 sort_by 获取模式 (movie / tv)
+    var mode = params.sort_by || "movie"; 
     var page = params.page || 1;
+    var sortMethod = params.sortBy || "popularity.desc"; // 读取新的小驼峰排序参数
+    
     var queryParams = {
         api_key: DEFAULT_TMDB_KEY, // 强制内置Key
         language: "zh-CN",
         page: page,
-        sort_by: params.sort_by || "popularity.desc",
+        sort_by: sortMethod, // 这里再喂给官方 API
         include_adult: false
     };
 
@@ -327,7 +337,7 @@ async function loadTMDBModule(params) {
         if (mode === "movie") queryParams.primary_release_year = params.year;
         else queryParams.first_air_date_year = params.year;
     }
-    if (params.sort_by && params.sort_by.includes("vote_average")) queryParams["vote_count.gte"] = 100;
+    if (sortMethod && sortMethod.includes("vote_average")) queryParams["vote_count.gte"] = 100;
 
     var endpoint = (mode === "movie") ? "/discover/movie" : "/discover/tv";
     var baseUrl = "https://api.themoviedb.org/3";
