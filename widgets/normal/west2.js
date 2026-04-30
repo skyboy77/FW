@@ -3,7 +3,7 @@ WidgetMetadata = {
     title: "欧美风向标|口碑与热度",
     author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖",
     description: "聚合烂番茄(口碑)与流媒体平台(热度)，高精度抓取无Emoji纯净版。",
-    version: "1.1.2", // 🚀 修复：精准校准 FlixPatrol 表格索引 (0:Movie, 1:TV, 2:All)
+    version: "1.1.3", // 🚀 升级：引入高精度时间过滤，防同名老剧误抓
     requiredVersion: "0.0.1",
     site: "https://t.me/MakkaPakkaOvO",
 
@@ -186,17 +186,12 @@ async function fetchFlixPatrolData(platform, region, mediaType) {
         const $ = Widget.html.load(html);
         const tables = $('.card-table tbody');
         
-        // 🌟 核心修复点：严格按照反馈的结构定位表格
         let targetTable = null;
-        
         if (mediaType === "all") {
-            // 第三个表格是 Movies & TV 综合 (如果有的话)
             targetTable = tables.length >= 3 ? tables.eq(2) : tables.eq(0);
         } else if (mediaType === "movie") {
-            // 第一个表格是 Movies
             targetTable = tables.eq(0);
         } else if (mediaType === "tv") {
-            // 第二个表格是 TV
             targetTable = tables.length >= 2 ? tables.eq(1) : tables.eq(0);
         }
 
@@ -227,18 +222,67 @@ async function searchTmdbFP(title, mediaType, rank) {
             params: { query: cleanTitle, language: "zh-CN", page: 1 }
         });
         
-        let match;
+        let results = res.results || [];
         if (mediaType === "all") {
-            match = (res.results || []).find(item => item.media_type === 'movie' || item.media_type === 'tv');
-        } else {
-            match = (res.results || [])[0];
+            results = results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
         }
         
-        if (!match) return null;
+        if (results.length === 0) return null;
+
+        // 🌟 新增核心：时间智能过滤逻辑
+        const now = Date.now();
+        const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000); // 电影近一年
+        const sixMonthsAgo = now - (180 * 24 * 60 * 60 * 1000); // 剧集近半年
+
+        let bestMatch = null;
+
+        // 只遍历前5个匹配结果，避免老剧重名抓错
+        for (let item of results.slice(0, 5)) {
+            const itemType = item.media_type || (mediaType === "all" ? "movie" : mediaType);
+            
+            if (itemType === "movie") {
+                if (item.release_date) {
+                    const releaseTime = new Date(item.release_date).getTime();
+                    if (releaseTime >= oneYearAgo) {
+                        bestMatch = item;
+                        break;
+                    }
+                }
+            } else if (itemType === "tv") {
+                // 剧集需要特殊处理：搜索接口只提供 first_air_date，会误杀老剧新更
+                // 获取该剧的最新更新日期进行校验
+                try {
+                    const detail = await Widget.tmdb.get(`/tv/${item.id}`, { params: { language: "zh-CN" } });
+                    const lastAirDate = detail.last_air_date || item.first_air_date;
+                    if (lastAirDate) {
+                        const airTime = new Date(lastAirDate).getTime();
+                        if (airTime >= sixMonthsAgo) {
+                            bestMatch = item;
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    // 如果详情获取失败，按首播时间粗略判断兜底
+                    if (item.first_air_date) {
+                        const airTime = new Date(item.first_air_date).getTime();
+                        if (airTime >= sixMonthsAgo) {
+                            bestMatch = item;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 🛡️ 兜底保护：如果前5个都没有近期上线的（说明上榜的真的是经典老剧如《老友记》）
+        // 则退回原逻辑：直接选取匹配度最高的第一条，防止榜单缺口
+        if (!bestMatch) {
+            bestMatch = results[0];
+        }
         
-        const actualMediaType = match.media_type || (mediaType === "all" ? "movie" : mediaType);
+        const actualMediaType = bestMatch.media_type || (mediaType === "all" ? "movie" : mediaType);
+        return buildItem(bestMatch, actualMediaType, { rank: rank });
         
-        return buildItem(match, actualMediaType, { rank: rank });
     } catch (e) { return null; }
 }
 
