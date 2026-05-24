@@ -1,14 +1,14 @@
 /**
- * 融合版 并发弹幕 Max (带自定义源名称版)
- * 结合了官方 1.1.6 匹配逻辑与自定义的高级过滤、转换和着色功能
+ * 融合版 并发弹幕 Max (支持完整选集列表版)
+ * 结合了官方匹配逻辑、自定义高级过滤，并修复了官方模块无法手动选集的问题
  */
 WidgetMetadata = {
-  id: "danmu_api_Max_binfa_merged3test",
-  title: "并发弹幕 (名字版)",
-  version: "1.3.1",
+  id: "danmu_api_Max_binfa_merged",
+  title: "并发弹幕 (融合匹配版)",
+  version: "1.3.2",
   requiredVersion: "0.0.2",
   site: "https://t.me/MakkaPakkaOvO",
-  description: "支持自定义源名称、并发搜索、繁简互转、数量限制、关键词屏蔽、颜色重写。已同步官方最新匹配逻辑。",
+  description: "保留完整剧集列表、自定义源名称、并发搜索、繁简互转、数量限制、关键词屏蔽、颜色重写。",
   author: "𝙈𝙖𝙠𝙠𝙖𝙋𝙖𝙠𝙠𝙖 & 编码助手",
   
   globalParams: [
@@ -70,7 +70,7 @@ WidgetMetadata = {
 };
 
 // ==========================================
-// 1. 繁简转换核心 (保留自定义逻辑)
+// 1. 繁简转换核心
 // ==========================================
 const DICT_URL_S2T = "https://cdn.jsdelivr.net/npm/opencc-data@1.0.3/data/STCharacters.txt";
 const DICT_URL_T2S = "https://cdn.jsdelivr.net/npm/opencc-data@1.0.3/data/TSCharacters.txt";
@@ -108,7 +108,7 @@ function convertText(text) {
 }
 
 // ==========================================
-// 2. 官方底层工具函数 (服务器处理与ID绑定)
+// 2. 底层工具与多源管理
 // ==========================================
 const DEFAULT_DANMU_SERVER = "https://api.dandanplay.net";
 const DANMU_SERVER_ID_SEPARATOR = "__FORWARD_DANMU_SERVER__";
@@ -146,10 +146,8 @@ function parseDanmuSourceLine(line) {
   return makeDanmuSource(title, server, true);
 }
 
-// 处理带有自定义名称的合并逻辑
 function getMergedDanmuSources(params) {
   const { server, serverName, server2, serverName2, server3, serverName3 } = params;
-  
   const buildLine = (name, url) => {
       if (!url || String(url).trim().length === 0) return "";
       if (name && String(name).trim().length > 0) return `${String(name).trim()},${String(url).trim()}`;
@@ -232,7 +230,6 @@ async function mapDanmuSourcesInBatches(sources, batchSize, task) {
   return results;
 }
 
-// 官方季数提取逻辑
 function extractSeasonNumber(animeTitle) {
   const title = String(animeTitle || "");
   let m = title.match(/第\s*([0-9一二三四五六七八九十壹贰叁肆伍陆柒捌玖拾]+)\s*[季部]/);
@@ -247,7 +244,6 @@ function extractSeasonNumber(animeTitle) {
   return null;
 }
 
-// 官方动漫过滤逻辑
 function filterAnimes(rawAnimes, type, season, queryTitle) {
   const movieTypes = ["movie", "电影", "奇幻片", "剧场版"];
   let animes = [];
@@ -295,14 +291,13 @@ function convertChineseNumber(chineseNumber) {
 }
 
 // ==========================================
-// 3. 核心 API 方法 (整合搜索、详情与弹幕获取)
+// 3. 核心 API 方法
 // ==========================================
 
 async function searchDanmu(params) {
   const { type, title, season, searchBlockKeywords } = params;
   let queryTitle = title;
   
-  // 结合所有源并发 (自动识别名称)
   const sources = getMergedDanmuSources(params);
   const shouldBindSource = shouldShowDanmuSource(sources);
   
@@ -384,6 +379,14 @@ function cleanAnimeTitle(title) {
   return String(title || "").replace(/（[^）]*）/g, "").replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim();
 }
 
+async function fetchEpisodesByBangumi(source, id) {
+  try {
+    const response = await Widget.http.get(`${source.server}/api/v2/bangumi/${id}`, { headers: getDanmuHeaders() });
+    const episodes = response && response.data && response.data.bangumi && response.data.bangumi.episodes;
+    return Array.isArray(episodes) && episodes.length > 0 ? episodes : null;
+  } catch (error) { return null; }
+}
+
 async function fetchEpisodesByMatch(source, title, season, episode) {
   const cleanTitle = cleanAnimeTitle(title).replace(/\s*第\s*[一二三四五六七八九十百零〇\d]+\s*[季部]\s*$/g, "").trim();
   const e = Number(episode);
@@ -400,19 +403,18 @@ async function fetchEpisodesByMatch(source, title, season, episode) {
     const data = response && response.data;
     if (!data || !data.isMatched || !Array.isArray(data.matches) || data.matches.length === 0) return null;
     const matched = data.matches[0];
+    
+    // 【核心修复】：官方原本直接返回单一集数，这里改为使用提取到的 animeId 去获取全部集数列表
+    if (matched.animeId) {
+        const fullEpisodes = await fetchEpisodesByBangumi(source, matched.animeId);
+        if (fullEpisodes && fullEpisodes.length > 0) return fullEpisodes;
+    }
+
     return [{
       episodeId: matched.episodeId,
       episodeTitle: matched.episodeTitle || `第${e}集`,
       episodeNumber: String(e),
     }];
-  } catch (error) { return null; }
-}
-
-async function fetchEpisodesByBangumi(source, id) {
-  try {
-    const response = await Widget.http.get(`${source.server}/api/v2/bangumi/${id}`, { headers: getDanmuHeaders() });
-    const episodes = response && response.data && response.data.bangumi && response.data.bangumi.episodes;
-    return Array.isArray(episodes) && episodes.length > 0 ? episodes : null;
   } catch (error) { return null; }
 }
 
@@ -482,8 +484,16 @@ async function getDetailById(params) {
 
   for (const source of sources) {
     try {
-      let episodes = await fetchEpisodesByMatch(source, matchTitle, season, episode);
-      if (!episodes) episodes = await fetchEpisodesByBangumi(source, parsedAnimeId.id);
+      let episodes = null;
+      
+      // 【核心修复】：优先判定是否为手动点击列表 (存在有效的 animeId)
+      // 如果有，则直接获取整部剧的完整集数列表，不走单集截断逻辑
+      if (parsedAnimeId && parsedAnimeId.id && parsedAnimeId.id !== "undefined" && parsedAnimeId.id !== "null") {
+          episodes = await fetchEpisodesByBangumi(source, parsedAnimeId.id);
+      }
+      
+      // 如果没有获取到（说明是软件后台自动搜索无感匹配），再按官方流程进行
+      if (!episodes) episodes = await fetchEpisodesByMatch(source, matchTitle, season, episode);
       if (!episodes) episodes = await fetchEpisodesByResearch(source, title, season);
       if (!episodes) episodes = await fetchEpisodesByLibrary(source, title, season);
 
